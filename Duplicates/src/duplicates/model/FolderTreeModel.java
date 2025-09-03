@@ -77,4 +77,16 @@ public class FolderTreeModel extends DefaultTreeModel {
             nodeStructureChanged(node);
         }
     }
+    private DefaultMutableTreeNode createNode(File folder) {
+        CheckBoxNode nodeData = new CheckBoxNode(folder);
+        DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeData);
+
+        File[] subFolders = fileAccess.getSubFolders(folder);
+        if (subFolders != null) {
+            for (File sub : subFolders) {
+                node.add(createNode(sub));
+            }
+        }
+        return node;
+    }
 }
