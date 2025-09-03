@@ -52,6 +52,4 @@ public class MainScreenView extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
         setVisible(true);
     }
-    
-    
 }
