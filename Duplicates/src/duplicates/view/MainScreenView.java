@@ -1,6 +1,7 @@
 package duplicates.view;
 
 import duplicates.controller.FileAccessController;
+import duplicates.view.FolderTreeCellRenderer;
 import duplicates.model.FolderTreeModel;
 
 import javax.swing.*;
@@ -25,6 +26,9 @@ public class MainScreenView extends JFrame {
         FolderTreeModel treeModel = new FolderTreeModel(controller, folderTree);
         folderTree.setModel(treeModel);
         folderTree.setRootVisible(true);
+        
+        // Neuen Renderer setzen
+        folderTree.setCellRenderer(new FolderTreeCellRenderer());
 
         add(new JScrollPane(folderTree), BorderLayout.CENTER);
         setVisible(true);
