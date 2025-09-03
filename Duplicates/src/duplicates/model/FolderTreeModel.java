@@ -13,6 +13,11 @@ public class FolderTreeModel extends DefaultTreeModel {
 
     private final FileAccessController fileAccess;
 
+    /**
+     * 
+     * @param controller
+     * @param tree
+     */
     public FolderTreeModel(FileAccessController controller, JTree tree) {
         super(new DefaultMutableTreeNode("Arbeitsplatz"));
         this.fileAccess = controller;
@@ -34,14 +39,20 @@ public class FolderTreeModel extends DefaultTreeModel {
         });
     }
 
-    /** Nur Root-Ebene einmalig aufbauen */
+    /**
+     * Nur Root-Ebene einmalig aufbauen 
+     */
     private void buildRootLevel() {
         DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) getRoot();
         File[] roots = fileAccess.getRootFolders();
         Arrays.stream(roots).forEach(root -> rootNode.add(createLazyNode(root)));
     }
 
-    /** Erstellt einen Node mit Dummy-Kind für Lazy Loading */
+    /**
+     * Erstellt einen Node mit Dummy-Kind für Lazy Loading
+     * @param folder
+     * @return
+     */
     private DefaultMutableTreeNode createLazyNode(File folder) {
         DefaultMutableTreeNode node = new DefaultMutableTreeNode(folder);
         if (fileAccess.getSubFolders(folder).length > 0) {
@@ -50,7 +61,10 @@ public class FolderTreeModel extends DefaultTreeModel {
         return node;
     }
 
-    /** Lädt echte Unterordner, wenn der Node aufgeklappt wird */
+    /**
+     * Lädt echte Unterordner, wenn der Node aufgeklappt wird
+     * @param node
+     */
     private void loadChildren(DefaultMutableTreeNode node) {
         // Wenn bereits geladen → nichts tun
         if (node.getChildCount() == 1 && "Loading...".equals(node.getChildAt(0).toString())) {
