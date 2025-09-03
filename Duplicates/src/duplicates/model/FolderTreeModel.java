@@ -25,8 +25,10 @@ public class FolderTreeModel extends DefaultTreeModel {
         DefaultMutableTreeNode node = new DefaultMutableTreeNode(folder);
 
         File[] subFolders = fileAccess.getSubFolders(folder);
-        for (File sub : subFolders) {
-            node.add(createNode(sub)); // rekursiv
+        if (subFolders != null) {  // ✅ Schutz gegen NullPointer
+            for (File sub : subFolders) {
+                node.add(createNode(sub)); // rekursiv
+            }
         }
 
         return node;
