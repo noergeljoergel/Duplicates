@@ -5,19 +5,22 @@ import java.io.File;
 public class FileAccessController {
 
     /**
-     * Liefert die Unterordner eines Verzeichnisses.
+     * Liefert alle Root-Verzeichnisse des Systems.
+     * Unter Windows: C:\, D:\, ...
+     * Unter Linux/Mac: /
      */
-    public File[] getSubFolders(File folder) {
-        if (folder != null && folder.isDirectory()) {
-            return folder.listFiles(File::isDirectory);
-        }
-        return new File[0];
+    public File[] getRootFolders() {
+        return File.listRoots(); // liefert File[]
     }
 
     /**
-     * Liefert das Standard-Root-Verzeichnis (z. B. Benutzerverzeichnis).
+     * Liefert alle Unterordner eines gegebenen Verzeichnisses.
      */
-    public File getRootFolder() {
-        return new File(System.getProperty("user.home"));
+    public File[] getSubFolders(File folder) {
+        if (folder != null && folder.isDirectory() && folder.canRead()) {
+            File[] files = folder.listFiles(File::isDirectory);
+            return files != null ? files : new File[0];
+        }
+        return new File[0];
     }
 }
