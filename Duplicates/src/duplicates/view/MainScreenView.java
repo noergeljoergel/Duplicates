@@ -8,8 +8,11 @@ import java.awt.*;
 
 public class MainScreenView extends JFrame {
 
+	/**
+	 * 
+	 */
     public MainScreenView() {
-        super("Duplicates – Dateisuche");
+        super("Duplicate Finder – Suche nach doppelten Dateien");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -47,7 +50,11 @@ public class MainScreenView extends JFrame {
         add(mainSplit, BorderLayout.CENTER);
         setVisible(true);
     }
-
+    
+    /**
+     * Menübereich oben links
+     * @return
+     */
     private JPanel createOptionsPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new GridBagLayout());
@@ -106,6 +113,10 @@ public class MainScreenView extends JFrame {
         return panel;
     }
     
+    /**
+     * Menübar
+     * @return
+     */
     private JMenuBar createMenuBar() {
         JMenuBar menuBar = new JMenuBar();
 
