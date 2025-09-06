@@ -4,73 +4,53 @@ import duplicates.model.CheckBoxNode;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;    // ✅ wichtig
 import javax.swing.tree.TreeCellEditor;
 import java.awt.*;
+import java.awt.event.MouseEvent;
 import java.util.EventObject;
 
 public class CheckBoxNodeEditor extends AbstractCellEditor implements TreeCellEditor {
+    private final CheckBoxNodeRenderer renderer = new CheckBoxNodeRenderer();
 
-    private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-    private final JCheckBox checkBox = new JCheckBox();
-    private final JLabel label = new JLabel();
+    private DefaultMutableTreeNode currentTreeNode; // <— den Knoten merken
+    private CheckBoxNode currentModel;              // <— und sein Modell
 
-    private CheckBoxNode currentNode;
-    private DefaultMutableTreeNode treeNode;
-    private JTree currentTree;              // ✅ Referenz auf den Baum
+    public CheckBoxNodeEditor(JTree tree) {
+        // Checkbox-Klick sofort committen
+        renderer.checkBox.addActionListener(e -> stopCellEditing());
 
-    public CheckBoxNodeEditor() {
-        panel.setOpaque(false);
-        checkBox.setOpaque(false);
-        panel.add(checkBox);
-        panel.add(label);
+        // Schon bei einfachem Klick editieren (und nicht expandieren)
+        tree.setToggleClickCount(0);
 
-        // Klick auf die Checkbox übernimmt den Wert ins Model und refresht den Node
-        checkBox.addActionListener(e -> {
-            if (currentNode != null) {
-                currentNode.setSelected(checkBox.isSelected());
-                if (currentTree != null && currentTree.getModel() instanceof DefaultTreeModel dtm) {
-                    dtm.nodeChanged(treeNode);        // ✅ Renderer neu zeichnen
-                }
-            }
-            stopCellEditing();                        // Editor schließen
-        });
+        // Wenn Fokus wechselt, committe laufende Edits
+        tree.setInvokesStopCellEditing(true);
     }
 
     @Override
-    public Component getTreeCellEditorComponent(JTree tree, Object value,
-                                                boolean selected, boolean expanded,
-                                                boolean leaf, int row) {
-        currentTree = tree;                           // ✅ Baum merken
-
-        if (value instanceof DefaultMutableTreeNode node &&
-            node.getUserObject() instanceof CheckBoxNode cbNode) {
-
-            treeNode = node;
-            currentNode = cbNode;
-
-            checkBox.setSelected(cbNode.isSelected());
-            label.setIcon(expanded ? UIManager.getIcon("Tree.openIcon")
-                                   : UIManager.getIcon("Tree.closedIcon"));
-            label.setText(cbNode.toString());
-        } else {
-            // Fallback, sollte eigentlich nicht vorkommen
-            treeNode = null;
-            currentNode = null;
-            checkBox.setSelected(false);
-            label.setIcon(UIManager.getIcon("Tree.closedIcon"));
-            label.setText(value != null ? value.toString() : "");
-        }
-        return panel;
+    public boolean isCellEditable(EventObject e) {
+        return (e instanceof MouseEvent me) && me.getClickCount() >= 1;
     }
 
     @Override
     public Object getCellEditorValue() {
-        return currentNode;                            // aktueller Node-Zustand
+        if (currentModel != null) {
+            // Status in das bestehende UserObject schreiben (kein neues Objekt!)
+            currentModel.setSelected(renderer.checkBox.isSelected());
+        }
+        return currentModel; // dieselbe Instanz zurückgeben
     }
 
     @Override
-    public boolean isCellEditable(EventObject event) {
-        return true;                                   // Klick überall erlaubt
+    public Component getTreeCellEditorComponent(
+            JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row) {
+
+        currentTreeNode = (value instanceof DefaultMutableTreeNode) ? (DefaultMutableTreeNode) value : null;
+        currentModel = null;
+
+        if (currentTreeNode != null && currentTreeNode.getUserObject() instanceof CheckBoxNode m) {
+            currentModel = m;
+        }
+        // gleiche Darstellung wie im Renderer — so verschwindet kein Text
+        return renderer.getTreeCellRendererComponent(tree, value, true, expanded, leaf, row, true);
     }
 }

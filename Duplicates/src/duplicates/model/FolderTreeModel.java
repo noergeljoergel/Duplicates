@@ -5,18 +5,25 @@ import duplicates.controller.FileAccessController;
 import javax.swing.JTree;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
-import javax.swing.tree.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FolderTreeModel extends DefaultTreeModel {
 
+    private static final String DUMMY = "Loading...";
+
     private final FileAccessController fileAccess;
 
+    // ✅ Merkt sich Auswahlzustände pro Pfad, damit Häkchen nicht „verschwinden“
+    private final Map<String, Boolean> selectionCache = new HashMap<>();
+
     /**
-     * 
-     * @param controller
-     * @param tree
+     * @param controller Datenquelle (Filesystem)
+     * @param tree       JTree für Lazy Loading Listener
      */
     public FolderTreeModel(FileAccessController controller, JTree tree) {
         super(new DefaultMutableTreeNode("Arbeitsplatz"));
@@ -28,65 +35,75 @@ public class FolderTreeModel extends DefaultTreeModel {
         tree.addTreeWillExpandListener(new TreeWillExpandListener() {
             @Override
             public void treeWillExpand(TreeExpansionEvent event) {
-                DefaultMutableTreeNode node = (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
+                DefaultMutableTreeNode node =
+                        (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
                 loadChildren(node);
             }
 
             @Override
             public void treeWillCollapse(TreeExpansionEvent event) {
-                // Nichts tun beim Zuklappen
+                // nichts tun
             }
         });
     }
 
     /**
-     * Nur Root-Ebene einmalig aufbauen 
+     * Nur Root-Ebene einmalig aufbauen
      */
     private void buildRootLevel() {
         DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) getRoot();
         File[] roots = fileAccess.getRootFolders();
+        if (roots == null) return;
+
         Arrays.stream(roots).forEach(root -> rootNode.add(createLazyNode(root)));
+        nodeStructureChanged(rootNode);
     }
 
     /**
-     * Erstellt einen Node mit Dummy-Kind für Lazy Loading
-     * @param folder
-     * @return
+     * Erstellt einen Node (mit CheckBoxNode als userObject) plus Dummy-Kind für Lazy Loading
      */
     private DefaultMutableTreeNode createLazyNode(File folder) {
-        DefaultMutableTreeNode node = new DefaultMutableTreeNode(folder);
-        if (fileAccess.getSubFolders(folder).length > 0) {
-            node.add(new DefaultMutableTreeNode("Loading...")); // Platzhalter
+        boolean selected = selectionCache.getOrDefault(folder.getAbsolutePath(), false);
+
+        // Kein (File, boolean)-Konstruktor vorhanden → 1-Arg verwenden + Setter
+        duplicates.model.CheckBoxNode nodeData = new duplicates.model.CheckBoxNode(folder);
+        nodeData.setSelected(selected); // <- Zustand aus dem Cache wiederherstellen
+
+        DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeData);
+
+        File[] subs = fileAccess.getSubFolders(folder);
+        if (subs != null && subs.length > 0) {
+            node.add(new DefaultMutableTreeNode(DUMMY)); // Platzhalter fürs Lazy Loading
         }
         return node;
     }
 
     /**
      * Lädt echte Unterordner, wenn der Node aufgeklappt wird
-     * @param node
      */
     private void loadChildren(DefaultMutableTreeNode node) {
-        // Wenn bereits geladen → nichts tun
-        if (node.getChildCount() == 1 && "Loading...".equals(node.getChildAt(0).toString())) {
+        // Nur laden, wenn genau EIN Dummy-Kind vorhanden ist
+        if (node.getChildCount() == 1 && DUMMY.equals(node.getChildAt(0).toString())) {
             node.removeAllChildren();
-            File folder = (File) node.getUserObject();
 
+            Object uo = node.getUserObject();
+            if (!(uo instanceof CheckBoxNode cb)) return;
+
+            File folder = cb.getFile();
             File[] subFolders = fileAccess.getSubFolders(folder);
-            Arrays.stream(subFolders).forEach(sub -> node.add(createLazyNode(sub)));
+            if (subFolders != null) {
+                Arrays.stream(subFolders).forEach(sub -> node.add(createLazyNode(sub)));
+            }
 
             nodeStructureChanged(node);
         }
     }
-    private DefaultMutableTreeNode createNode(File folder) {
-        CheckBoxNode nodeData = new CheckBoxNode(folder);
-        DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeData);
 
-        File[] subFolders = fileAccess.getSubFolders(folder);
-        if (subFolders != null) {
-            for (File sub : subFolders) {
-                node.add(createNode(sub));
-            }
-        }
-        return node;
+    /**
+     * Von außen aufrufen, wenn der Editor eine Auswahl ändert.
+     * So bleibt der Zustand bei Lazy-Reloads erhalten.
+     */
+    public void rememberSelection(String absolutePath, boolean selected) {
+        selectionCache.put(absolutePath, selected);
     }
 }

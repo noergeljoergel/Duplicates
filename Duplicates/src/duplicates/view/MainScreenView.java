@@ -9,15 +9,17 @@ import java.awt.*;
 import javax.swing.text.NumberFormatter;
 import java.text.NumberFormat;
 import javax.swing.text.DefaultFormatter;
-
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.tree.DefaultMutableTreeNode;
 
 public class MainScreenView extends JFrame {
 
-    // ✅ Feld für die Liste der ausgewählten Ordner
+    // Feld für die Liste der ausgewählten Ordner
     private final DefaultListModel<String> selectedFoldersModel = new DefaultListModel<>();
     private final JList<String> selectedFoldersList = new JList<>(selectedFoldersModel);
 
-    // ✅ Felder und Checkboxen als Instanzvariablen, damit sie auch im Menü verfügbar sind
+    // Felder und Checkboxen als Instanzvariablen, damit sie auch im Menü verfügbar sind
     private JTextField minField;
     private JTextField maxField;
     private JTextField fileExtention;
@@ -35,7 +37,7 @@ public class MainScreenView extends JFrame {
         // Menüleiste hinzufügen
         setJMenuBar(createMenuBar());
 
-        // --- Controller + Baum erstellen
+        // Controller + Baum erstellen
         FileAccessController controller = new FileAccessController();
         JTree folderTree = new JTree();
         FolderTreeModel treeModel = new FolderTreeModel(controller, folderTree);
@@ -44,45 +46,59 @@ public class MainScreenView extends JFrame {
 
         // Renderer + Editor setzen (Checkboxen)
         folderTree.setCellRenderer(new CheckBoxNodeRenderer());
-        folderTree.setCellEditor(new CheckBoxNodeEditor());
+        folderTree.setCellEditor(new CheckBoxNodeEditor(folderTree));
         folderTree.setEditable(true);
+        folderTree.setToggleClickCount(0);
+        folderTree.setInvokesStopCellEditing(true);
+        folderTree.setRowHeight(0); // automatische Höhe
 
-        // ✅ Listener: Auswahländerungen in Liste unten eintragen
-        folderTree.getCellEditor().addCellEditorListener(new javax.swing.event.CellEditorListener() {
-            @Override
-            public void editingStopped(javax.swing.event.ChangeEvent e) {
-                Object value = folderTree.getLastSelectedPathComponent();
-                if (value instanceof javax.swing.tree.DefaultMutableTreeNode node &&
-                    node.getUserObject() instanceof duplicates.model.CheckBoxNode cbNode) {
-
-                    String folderPath = cbNode.getFile().getAbsolutePath();
-                    if (cbNode.isSelected()) {
-                        if (!selectedFoldersModel.contains(folderPath)) {
-                            selectedFoldersModel.addElement(folderPath);
-                        }
-                    } else {
-                        selectedFoldersModel.removeElement(folderPath);
-                    }
+        // Listener: Auswahländerungen in Liste unten eintragen
+        // -> deterministisch über TreeModelListener, NICHT über getLastSelectedPathComponent()
+        treeModel.addTreeModelListener(new TreeModelListener() {
+            @Override public void treeNodesChanged(TreeModelEvent e) {
+                Object[] children = e.getChildren();
+                if (children == null || children.length == 0) {
+                    handleNode(e.getTreePath().getLastPathComponent());
+                } else {
+                    for (Object child : children) handleNode(child);
                 }
             }
+            @Override public void treeNodesInserted(TreeModelEvent e) {}
+            @Override public void treeNodesRemoved(TreeModelEvent e) {}
+            @Override public void treeStructureChanged(TreeModelEvent e) {}
 
-            @Override
-            public void editingCanceled(javax.swing.event.ChangeEvent e) {
-                // nichts tun
+            private void handleNode(Object obj) {
+                if (!(obj instanceof DefaultMutableTreeNode node)) return;
+                Object uo = node.getUserObject();
+                if (!(uo instanceof duplicates.model.CheckBoxNode cbNode)) return;
+
+                String folderPath = cbNode.getFile().getAbsolutePath();
+
+                // ✅ Auswahl in der Liste
+                if (cbNode.isSelected()) {
+                    if (!selectedFoldersModel.contains(folderPath)) {
+                        selectedFoldersModel.addElement(folderPath);
+                    }
+                } else {
+                    selectedFoldersModel.removeElement(folderPath);
+                }
+
+                // ✅ Auswahl im Model cachen (wichtig für Lazy-Loading)
+                treeModel.rememberSelection(folderPath, cbNode.isSelected());
             }
         });
 
-        // --- Rechte Seite: ScrollPane mit Ordnerbaum
+        // Rechte Seite: ScrollPane mit Ordnerbaum
         JScrollPane treeScroll = new JScrollPane(folderTree);
 
-        // --- Linke Seite: oben Optionen, unten Liste
+        // Linke Seite: oben Optionen, unten Liste
         JPanel optionsPanel = createOptionsPanel();
         JScrollPane selectedFoldersScroll = new JScrollPane(selectedFoldersList);
 
         JSplitPane leftSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, optionsPanel, selectedFoldersScroll);
         leftSplit.setResizeWeight(0.4);
 
-        // --- Haupt-SplitPane
+        // Haupt-SplitPane
         JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftSplit, treeScroll);
         mainSplit.setResizeWeight(0.4);
 
@@ -100,11 +116,7 @@ public class MainScreenView extends JFrame {
 
         int row = 0;
 
-        // --- Felder & Checkboxen als Instanzvariablen
-        minField = new JTextField(15);
-        maxField = new JTextField(15);
-        fileExtention = new JTextField(15);
-
+        // Felder & Checkboxen als Instanzvariablen
         chkFileSize = new JCheckBox("Dateigröße berücksichtigen");
         chkFileName = new JCheckBox("Dateiname berücksichtigen");
         chkSubFolder = new JCheckBox("Unterordner berücksichtigen");
@@ -116,16 +128,17 @@ public class MainScreenView extends JFrame {
         panel.add(new JLabel("Min File Size:"), gbc);
 
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
-        numberFormat.setGroupingUsed(true); // sorgt für 1000er-Punkte
-        numberFormat.setMaximumFractionDigits(0); // keine Nachkommastellen
+        numberFormat.setGroupingUsed(true);         // sorgt für 1000er-Punkte
+        numberFormat.setMaximumFractionDigits(0);   // keine Nachkommastellen
 
         NumberFormatter formatterNumbers = new NumberFormatter(numberFormat);
         formatterNumbers.setValueClass(Integer.class);
-        formatterNumbers.setAllowsInvalid(false); // verhindert ungültige Eingaben
-        formatterNumbers.setMinimum(0);          // keine negativen Zahlen
-        
-        JFormattedTextField minField = new JFormattedTextField(formatterNumbers);
-        minField.setColumns(10);
+        formatterNumbers.setAllowsInvalid(false);   // verhindert ungültige Eingaben
+        formatterNumbers.setMinimum(0);             // keine negativen Zahlen
+
+        // Instanzfelder befüllen (keine Schattenvariablen!)
+        minField = new JFormattedTextField(formatterNumbers);
+        ((JFormattedTextField) minField).setColumns(10);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
@@ -140,9 +153,9 @@ public class MainScreenView extends JFrame {
         gbc.gridy = row;
         gbc.gridx = 0;
         panel.add(new JLabel("Max File Size:"), gbc);
-        
-        JFormattedTextField maxField = new JFormattedTextField(formatterNumbers);
-        maxField.setColumns(10);
+
+        maxField = new JFormattedTextField(formatterNumbers);
+        ((JFormattedTextField) maxField).setColumns(10);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
@@ -151,22 +164,19 @@ public class MainScreenView extends JFrame {
         gbc.gridx = 2;
         gbc.weightx = 0;
         panel.add(new JLabel("MB"), gbc);
-        
-        
-        
-        
-        // Max File Size
+
+        // File Extensions
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
         panel.add(new JLabel("File Extentions (divided by ', ')"), gbc);
-        
+
         DefaultFormatter formatterText = new DefaultFormatter();
         formatterText.setOverwriteMode(false); // Eingaben anhängen statt überschreiben
-        formatterText.setAllowsInvalid(true);  // alles erlauben (freie Texteingabe)
-        
-        JFormattedTextField fileExtention = new JFormattedTextField(formatterText);
-        fileExtention.setColumns(10);
+        formatterText.setAllowsInvalid(true);  // freie Texteingabe
+
+        fileExtention = new JFormattedTextField(formatterText);
+        ((JFormattedTextField) fileExtention).setColumns(10);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
@@ -174,11 +184,7 @@ public class MainScreenView extends JFrame {
 
         gbc.gridx = 2;
         gbc.weightx = 0;
-        panel.add(new JLabel("MB"), gbc);
-        
-        
-        
-        
+        panel.add(new JLabel(""), gbc); // (hier war zuvor "MB" – für Extensions nicht nötig)
 
         // Checkboxes
         gbc.gridx = 0;
@@ -189,14 +195,8 @@ public class MainScreenView extends JFrame {
         gbc.gridy = ++row; panel.add(chkFileName, gbc);
         gbc.gridy = ++row; panel.add(chkSubFolder, gbc);
         gbc.gridy = ++row; panel.add(chkFileExtention, gbc);
-        
-//        gbc.gridy = ++row; panel.add(new JCheckBox("Wildcard 1"), gbc);
-//        gbc.gridy = ++row; panel.add(new JCheckBox("Wildcard 2"), gbc);
-//        gbc.gridy = ++row; panel.add(new JCheckBox("Wildcard 3"), gbc);
 
-        
-        
-        // --- Spacer
+        // Spacer
         gbc.gridy = ++row;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
@@ -209,21 +209,19 @@ public class MainScreenView extends JFrame {
         JButton btnSave = new JButton("Save Settings");
         btnSave.addActionListener(e -> {
             try {
-            		double min = 0;
-            		double max = 0;
-            		String fileExt = "";
+                double min = 0;
+                double max = 0;
+                String fileExt = "";
 
-            		String minText = minField.getText().trim();
-            		if (!minText.isEmpty()) min = Double.parseDouble(minText);
+                String minText = minField.getText().trim();
+                if (!minText.isEmpty()) min = Double.parseDouble(minText);
 
                 String maxText = maxField.getText().trim();
                 if (!maxText.isEmpty()) max = Double.parseDouble(maxText);
-                
+
                 String fExtTxt = fileExtention.getText().trim();
                 if (!fExtTxt.isEmpty()) fileExt = fExtTxt;
-  
-                
-                
+
                 boolean fileSize = chkFileSize.isSelected();
                 boolean fileName = chkFileName.isSelected();
                 boolean subFolder = chkSubFolder.isSelected();
@@ -274,13 +272,13 @@ public class MainScreenView extends JFrame {
                 Object[] settings = XMLController.readSettingsFromXML();
                 if (settings != null && settings.length == 7) {
                     applySettings(
-                    		(double) settings[0],
-                    		(double) settings[1],
-                    		(String) settings[2],
-                    		(boolean) settings[3],
-                    		(boolean) settings[4],
-                    		(boolean) settings[5],
-                    		(boolean) settings[6]
+                            (double) settings[0],
+                            (double) settings[1],
+                            (String) settings[2],
+                            (boolean) settings[3],
+                            (boolean) settings[4],
+                            (boolean) settings[5],
+                            (boolean) settings[6]
                     );
                     JOptionPane.showMessageDialog(this, "Einstellungen geladen!",
                             "Info", JOptionPane.INFORMATION_MESSAGE);
@@ -323,7 +321,7 @@ public class MainScreenView extends JFrame {
     private void applySettings(double min, double max, String ext, boolean fileSize, boolean fileName, boolean subFolder, boolean fExt) {
         minField.setText(String.valueOf(min));
         maxField.setText(String.valueOf(max));
-        fileExtention.setText(ext);       
+        fileExtention.setText(ext);
         chkFileSize.setSelected(fileSize);
         chkFileName.setSelected(fileName);
         chkSubFolder.setSelected(subFolder);
