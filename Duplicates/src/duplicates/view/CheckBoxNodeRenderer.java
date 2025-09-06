@@ -3,59 +3,59 @@ package duplicates.view;
 import duplicates.model.CheckBoxNode;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.filechooser.FileSystemView;
 import java.awt.*;
+import java.io.File;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreeCellRenderer;
 
-public class CheckBoxNodeRenderer extends DefaultTreeCellRenderer {
-
-    private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-    private final JCheckBox checkBox = new JCheckBox();
+public class CheckBoxNodeRenderer implements TreeCellRenderer {
+    private final JPanel panel = new JPanel(new BorderLayout());
+    final JCheckBox checkBox = new JCheckBox();
     private final JLabel label = new JLabel();
+
+    private final FileSystemView fsv = FileSystemView.getFileSystemView();
 
     public CheckBoxNodeRenderer() {
         panel.setOpaque(false);
         checkBox.setOpaque(false);
-
-        // Checkbox zuerst, dann Label
-        panel.add(checkBox);
-        panel.add(label);
+        panel.add(checkBox, BorderLayout.WEST);
+        panel.add(label, BorderLayout.CENTER);
     }
 
     @Override
-    public Component getTreeCellRendererComponent(JTree tree, Object value,
-                                                  boolean selected, boolean expanded,
-                                                  boolean leaf, int row, boolean hasFocus) {
+    public Component getTreeCellRendererComponent(
+            JTree tree, Object value, boolean selected, boolean expanded,
+            boolean leaf, int row, boolean hasFocus) {
 
-        // Hintergrundfarbe bei Auswahl
-        if (selected) {
-            panel.setBackground(new Color(0, 120, 215)); // Windows-Explorer-Blau
-            panel.setOpaque(true);
-            checkBox.setForeground(Color.WHITE);
-            label.setForeground(Color.WHITE);
-        } else {
-            panel.setOpaque(false);
-            checkBox.setForeground(Color.BLACK);
-            label.setForeground(Color.BLACK);
+        if (value instanceof DefaultMutableTreeNode node) {
+            Object uo = node.getUserObject();
+
+            if (uo instanceof duplicates.model.CheckBoxNode cbNode) {
+                File f = cbNode.getFile();
+
+                // Text: zuerst SystemDisplayName, sonst Pfad als Fallback
+                String name = fsv.getSystemDisplayName(f);
+                if (name == null || name.isBlank()) {
+                    name = f.getAbsolutePath();
+                    // optional: abschließenden Separator bei Laufwerken entfernen
+                    if (name.endsWith(File.separator) && name.length() > 1) {
+                        name = name.substring(0, name.length() - 1);
+                    }
+                }
+
+                checkBox.setVisible(true);
+                checkBox.setSelected(cbNode.isSelected());
+                label.setText(name);
+                label.setIcon(fsv.getSystemIcon(f)); // hübsches Laufwerks-/Ordnersymbol
+
+            } else {
+                // z. B. "Arbeitsplatz" oder "Loading..." → ohne Checkbox
+                checkBox.setVisible(false);
+                label.setIcon(null);
+                label.setText(String.valueOf(uo));
+            }
         }
-
-        if (value instanceof DefaultMutableTreeNode node &&
-            node.getUserObject() instanceof CheckBoxNode cbNode) {
-
-            // ✅ Checkbox nur als Haken, kein Text
-            checkBox.setSelected(cbNode.isSelected());
-
-            // Label: Icon + Text
-            Icon folderIcon = expanded ? getOpenIcon() : getClosedIcon();
-            label.setIcon(folderIcon);
-            label.setText(cbNode.toString());
-
-        } else {
-            checkBox.setSelected(false);
-            label.setIcon(getClosedIcon());
-            label.setText(value.toString());
-        }
-
         return panel;
     }
 }
