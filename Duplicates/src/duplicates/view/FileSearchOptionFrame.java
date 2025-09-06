@@ -1,19 +1,19 @@
 package duplicates.view;
 
-import duplicates.controller.XMLController;
-
 import javax.swing.*;
 import javax.swing.text.DefaultFormatter;
 import javax.swing.text.NumberFormatter;
+import javax.swing.text.MaskFormatter;
 import java.awt.*;
-import java.lang.reflect.Array;
 import java.text.NumberFormat;
-import java.util.Arrays;
-
+import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 
 /**
- * Optionen für die Duplikatsuche (aus MainScreenView ausgelagert).
- * Später kann hier parallel ein FileSearchOptionFrame existieren.
+ * Optionen für die Dateisuche (ohne DatePicker).
+ * Datumsfelder: dd.MM.yyyy – Punkte vorgegeben, nur Ziffern erlaubt.
  */
 public class FileSearchOptionFrame extends JPanel {
 
@@ -22,10 +22,15 @@ public class FileSearchOptionFrame extends JPanel {
     private JFormattedTextField maxField;
     private JFormattedTextField fileExtention;
     private JFormattedTextField fileNameString1;
-    private JFormattedTextField fileNameString2;
-    private JFormattedTextField fileNameString3;
-    private JFormattedTextField fileNameString4;
-    
+
+    // Datum: erstellt am
+    private JComboBox<String> createdDateOperator;
+    private JFormattedTextField createdDateField;
+
+    // Datum: geändert am
+    private JComboBox<String> modifiedDateOperator;
+    private JFormattedTextField modificationDate;
+
     private JCheckBox chkSubFolder;
 
     public FileSearchOptionFrame() {
@@ -34,7 +39,7 @@ public class FileSearchOptionFrame extends JPanel {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 4);
         gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill = GridBagConstraints.HORIZONTAL; // Standard
         gbc.weightx = 0;
 
         int row = 0;
@@ -45,76 +50,129 @@ public class FileSearchOptionFrame extends JPanel {
         // --- Min File Size ---
         gbc.gridy = row;
         gbc.gridx = 0;
-        add(new JLabel("Min File Size:"), gbc);
+        add(new JLabel("min file size in MB:"), gbc);
 
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
-        numberFormat.setGroupingUsed(true);         // 1000er-Punkte
-        numberFormat.setMaximumFractionDigits(0);   // keine Nachkommastellen
+        numberFormat.setGroupingUsed(true);
+        numberFormat.setMaximumFractionDigits(0);
 
         NumberFormatter formatterNumbers = new NumberFormatter(numberFormat);
         formatterNumbers.setValueClass(Long.class);
-        formatterNumbers.setAllowsInvalid(false);   // verhindert ungültige Eingaben
-        formatterNumbers.setMinimum(0L);            // keine negativen Zahlen
+        formatterNumbers.setAllowsInvalid(false);
+        formatterNumbers.setMinimum(0L);
 
         minField = new JFormattedTextField(formatterNumbers);
         minField.setColumns(10);
 
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        // Feld NICHT strecken -> bündig wie Datumsfelder
+        gbc.weightx = 0;
+        int oldFill = gbc.fill;
+        gbc.fill = GridBagConstraints.NONE;
         add(minField, gbc);
+        // zurücksetzen
+        gbc.fill = oldFill;
 
         gbc.gridx = 2; gbc.weightx = 0;
-        add(new JLabel("MB"), gbc);
+        add(new JLabel(""), gbc);
 
         // --- Max File Size ---
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        add(new JLabel("Max File Size:"), gbc);
+        add(new JLabel("max file size in MB:"), gbc);
 
         maxField = new JFormattedTextField(formatterNumbers);
         maxField.setColumns(10);
 
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 0;
+        oldFill = gbc.fill;
+        gbc.fill = GridBagConstraints.NONE;
         add(maxField, gbc);
+        gbc.fill = oldFill;
 
         gbc.gridx = 2; gbc.weightx = 0;
-        add(new JLabel("MB"), gbc);
+        add(new JLabel(""), gbc);
 
         // --- File Extensions ---
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        add(new JLabel("File Extentions (divided by ', ')"), gbc);
+        add(new JLabel("file extentions"), gbc);
 
         DefaultFormatter formatterText = new DefaultFormatter();
-        formatterText.setOverwriteMode(false); // Eingaben anhängen statt überschreiben
-        formatterText.setAllowsInvalid(true);  // freie Texteingabe
+        formatterText.setOverwriteMode(false);
+        formatterText.setAllowsInvalid(true);
 
         fileExtention = new JFormattedTextField(formatterText);
         fileExtention.setColumns(10);
 
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 0;
+        oldFill = gbc.fill;
+        gbc.fill = GridBagConstraints.NONE;
         add(fileExtention, gbc);
+        gbc.fill = oldFill;
 
         gbc.gridx = 2; gbc.weightx = 0;
-        add(new JLabel(""), gbc); // kein "MB" hier nötig
-        
-        
-        // --- String #1 ---
+        add(new JLabel(""), gbc);
+
+        // --- String #1 (file name) ---
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        add(new JLabel("String #1"), gbc);
+        add(new JLabel("file name"), gbc);
 
         fileNameString1 = new JFormattedTextField(formatterText);
         fileNameString1.setColumns(10);
 
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 0;
+        oldFill = gbc.fill;
+        gbc.fill = GridBagConstraints.NONE;
         add(fileNameString1, gbc);
+        gbc.fill = oldFill;
 
         gbc.gridx = 2; gbc.weightx = 0;
-        add(new JLabel(""), gbc);   
-        
+        add(new JLabel(""), gbc);
+
+        // --- Datum (file created) ---
+        row++;
+        gbc.gridy = row;
+
+        gbc.gridx = 0; gbc.weightx = 0;
+        add(new JLabel("file created"), gbc);
+
+        JPanel createdPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        createdDateOperator = createOpCombo();
+        createdPanel.add(createdDateOperator);
+
+        createdDateField = createStrictDateField();
+        createdPanel.add(createdDateField);
+
+        gbc.gridx = 1; gbc.gridwidth = 2; gbc.weightx = 1.0; // Panel darf breit werden, Inhalte bleiben kompakt
+        add(createdPanel, gbc);
+        gbc.gridwidth = 1;
+
+        // --- Datum (latest changes) ---
+        row++;
+        gbc.gridy = row;
+
+        gbc.gridx = 0; gbc.weightx = 0;
+        add(new JLabel("latest changes"), gbc);
+
+        JPanel modifiedPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        modifiedDateOperator = createOpCombo();
+        modifiedPanel.add(modifiedDateOperator);
+
+        modificationDate = createStrictDateField();
+        modifiedPanel.add(modificationDate);
+
+        gbc.gridx = 1; gbc.gridwidth = 2; gbc.weightx = 1.0;
+        add(modifiedPanel, gbc);
+        gbc.gridwidth = 1;
+
         // --- Checkboxes ---
         gbc.gridx = 0;
         gbc.gridwidth = 2;
@@ -131,7 +189,6 @@ public class FileSearchOptionFrame extends JPanel {
         // --- Button Panel ---
         JPanel buttonPanel = new JPanel(new BorderLayout());
 
-        // Save Button mit ActionListener
         JButton btnSave = new JButton("Save Settings");
         btnSave.addActionListener(e -> {
             try {
@@ -141,7 +198,11 @@ public class FileSearchOptionFrame extends JPanel {
 
                 boolean subFolder = chkSubFolder.isSelected();
 
-//                XMLController.saveSettingsToXML(min, max, ext, fileSize, fileName, subFolder, fExtention);
+                String createdOp = (String) createdDateOperator.getSelectedItem();
+                String createdStr = normalizeDateString(createdDateField.getText());
+
+                String modifiedOp = (String) modifiedDateOperator.getSelectedItem();
+                String modifiedStr = normalizeDateString(modificationDate.getText());
 
                 JOptionPane.showMessageDialog(this, "Einstellungen gespeichert!",
                         "Info", JOptionPane.INFORMATION_MESSAGE);
@@ -172,43 +233,103 @@ public class FileSearchOptionFrame extends JPanel {
         add(buttonPanel, gbc);
     }
 
-    // Hilfsmethode: robust Zahlenwert lesen (0 bei leer)
+    /** Mini-ComboBox ~2–3 Zeichen breit, mittig, kompakt. */
+    private JComboBox<String> createOpCombo() {
+        JComboBox<String> combo = new JComboBox<>(new String[]{"<", "<=", "=", ">=", ">"});
+        combo.setEditable(false);
+        combo.setPrototypeDisplayValue(" >= "); // etwas Puffer
+
+        combo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                JLabel l = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                l.setHorizontalAlignment(SwingConstants.CENTER);
+                return l;
+            }
+        });
+
+        // Schmale, aber sichere Breite
+        FontMetrics fm = combo.getFontMetrics(combo.getFont());
+        int textW = fm.stringWidth(" >= ");
+        int arrowAndInsets = 24;
+        int w = textW + arrowAndInsets;
+
+        Dimension size = new Dimension(w, combo.getPreferredSize().height);
+        combo.setPreferredSize(size);
+        combo.setMinimumSize(size);
+        combo.setMaximumSize(size);
+
+        return combo;
+    }
+
+    /** Datumsfeld: Punkte vorgegeben, nur Ziffern erlaubt, strikte Datum-Validierung. */
+    private JFormattedTextField createStrictDateField() {
+        MaskFormatter mask;
+        try {
+            mask = new MaskFormatter("##.##.####");
+            mask.setPlaceholderCharacter('_');
+            mask.setValidCharacters("0123456789");
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+
+        JFormattedTextField f = new JFormattedTextField(mask);
+        f.setColumns(10);
+        f.setFocusLostBehavior(JFormattedTextField.COMMIT_OR_REVERT);
+
+        // Strenge Validierung
+        f.setInputVerifier(new InputVerifier() {
+            final DateTimeFormatter STRICT_FMT =
+                    DateTimeFormatter.ofPattern("dd.MM.uuuu").withResolverStyle(ResolverStyle.STRICT);
+
+            @Override
+            public boolean verify(JComponent input) {
+                String s = ((JFormattedTextField) input).getText();
+                if (isDateBlank(s)) return true;
+                try {
+                    LocalDate.parse(s, STRICT_FMT);
+                    input.setBackground(UIManager.getColor("TextField.background"));
+                    return true;
+                } catch (Exception ex) {
+                    input.setBackground(new Color(255, 230, 230));
+                    return false;
+                }
+            }
+
+            @Override
+            public boolean shouldYieldFocus(JComponent input) {
+                boolean ok = verify(input);
+                if (!ok) Toolkit.getDefaultToolkit().beep();
+                return ok;
+            }
+        });
+
+        return f;
+    }
+
+    private boolean isDateBlank(String s) {
+        if (s == null) return true;
+        String t = s.replace('.', ' ').trim();
+        for (int i = 0; i < t.length(); i++) {
+            if (Character.isDigit(t.charAt(i))) return false;
+        }
+        return true;
+    }
+
+    private String normalizeDateString(String s) {
+        return isDateBlank(s) ? "" : s;
+    }
+
     private double numberFrom(JFormattedTextField f) {
         Object v = f.getValue();
         if (v instanceof Number n) return n.doubleValue();
         String t = f.getText();
         if (t == null || t.isBlank()) return 0d;
         try {
-            // Fallback: Gruppierungszeichen entfernen, Komma zu Punkt
             return Double.parseDouble(t.replace(".", "").replace(",", "."));
         } catch (NumberFormatException e) {
             return 0d;
         }
-    }
-
-    // Öffentliche API für MainScreenView (Menü "Einstellungen laden")
-    public void applySettings(double min, double max, String ext,
-                              boolean fileSize, boolean fileName,
-                              boolean subFolder, boolean fExt) {
-        minField.setValue((long) Math.round(min));
-        maxField.setValue((long) Math.round(max));
-        fileExtention.setText(ext != null ? ext : "");
-        chkSubFolder.setSelected(subFolder);
-
-    }
-    
-    public String[] splitExtentionString(String input) {
-        if (input == null || input.trim().isEmpty()) {
-            return new String[0];
-        }
-
-        
-        return Arrays.stream(input.split("\\s*,\\s*"))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(s -> s.replaceFirst("^\\.", "")) // führenden Punkt bei ".jpg" entfernen
-                .map(String::toLowerCase)             // klein schreiben
-                .distinct()                           // doppelte entfernen (optional)
-                .toArray(String[]::new);
     }
 }
