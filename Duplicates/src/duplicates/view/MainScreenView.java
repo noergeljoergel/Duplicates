@@ -6,9 +6,6 @@ import duplicates.model.FolderTreeModel;
 
 import javax.swing.*;
 import java.awt.*;
-import javax.swing.text.NumberFormatter;
-import java.text.NumberFormat;
-import javax.swing.text.DefaultFormatter;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -19,14 +16,11 @@ public class MainScreenView extends JFrame {
     private final DefaultListModel<String> selectedFoldersModel = new DefaultListModel<>();
     private final JList<String> selectedFoldersList = new JList<>(selectedFoldersModel);
 
-    // Felder und Checkboxen als Instanzvariablen, damit sie auch im Menü verfügbar sind
-    private JTextField minField;
-    private JTextField maxField;
-    private JTextField fileExtention;
-    private JCheckBox chkFileSize;
-    private JCheckBox chkFileName;
-    private JCheckBox chkSubFolder;
-    private JCheckBox chkFileExtention;
+    // Oberer linker Bereich als Tabs
+    private JTabbedPane optionsTabs;
+    // Reiter-Inhalte
+    private DuplicateSearchOptionFrame duplicateOptionsPanel;
+    private FileSearchOptionFrame fileSearchOptionsPanel; // existiert bereits
 
     public MainScreenView() {
         super("Duplicates – Dateisuche");
@@ -53,7 +47,7 @@ public class MainScreenView extends JFrame {
         folderTree.setRowHeight(0); // automatische Höhe
 
         // Listener: Auswahländerungen in Liste unten eintragen
-        // -> deterministisch über TreeModelListener, NICHT über getLastSelectedPathComponent()
+        // -> deterministisch über TreeModelListener (nicht über Selektion)
         treeModel.addTreeModelListener(new TreeModelListener() {
             @Override public void treeNodesChanged(TreeModelEvent e) {
                 Object[] children = e.getChildren();
@@ -91,11 +85,26 @@ public class MainScreenView extends JFrame {
         // Rechte Seite: ScrollPane mit Ordnerbaum
         JScrollPane treeScroll = new JScrollPane(folderTree);
 
-        // Linke Seite: oben Optionen, unten Liste
-        JPanel optionsPanel = createOptionsPanel();
+        // Linke Seite: oben Reiter mit Optionen, unten Liste
+        optionsTabs = new JTabbedPane();
+
+        // Reiter 1: Duplicate Search
+        duplicateOptionsPanel = new DuplicateSearchOptionFrame();
+        optionsTabs.addTab("Duplicate Search", duplicateOptionsPanel);
+
+        // Reiter 2: File Search (deine bestehende Klasse)
+        fileSearchOptionsPanel = new FileSearchOptionFrame();
+        optionsTabs.addTab("File Search", fileSearchOptionsPanel);
+
+        // Reiter 3: Info (zentrierter Text)
+        JPanel infoPanel = new JPanel(new BorderLayout());
+        JLabel infoLabel = new JLabel("Copyright Jörg Hesse 2025", SwingConstants.CENTER);
+        infoPanel.add(infoLabel, BorderLayout.CENTER);
+        optionsTabs.addTab("Info", infoPanel);
+
         JScrollPane selectedFoldersScroll = new JScrollPane(selectedFoldersList);
 
-        JSplitPane leftSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, optionsPanel, selectedFoldersScroll);
+        JSplitPane leftSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, optionsTabs, selectedFoldersScroll);
         leftSplit.setResizeWeight(0.4);
 
         // Haupt-SplitPane
@@ -104,160 +113,6 @@ public class MainScreenView extends JFrame {
 
         add(mainSplit, BorderLayout.CENTER);
         setVisible(true);
-    }
-
-    private JPanel createOptionsPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(4, 4, 4, 4);
-        gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 0;
-
-        int row = 0;
-
-        // Felder & Checkboxen als Instanzvariablen
-        chkFileSize = new JCheckBox("Dateigröße berücksichtigen");
-        chkFileName = new JCheckBox("Dateiname berücksichtigen");
-        chkSubFolder = new JCheckBox("Unterordner berücksichtigen");
-        chkFileExtention = new JCheckBox("Dateierweiterungen berücksichtigen");
-
-        // Min File Size
-        gbc.gridy = row;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Min File Size:"), gbc);
-
-        NumberFormat numberFormat = NumberFormat.getIntegerInstance();
-        numberFormat.setGroupingUsed(true);         // sorgt für 1000er-Punkte
-        numberFormat.setMaximumFractionDigits(0);   // keine Nachkommastellen
-
-        NumberFormatter formatterNumbers = new NumberFormatter(numberFormat);
-        formatterNumbers.setValueClass(Integer.class);
-        formatterNumbers.setAllowsInvalid(false);   // verhindert ungültige Eingaben
-        formatterNumbers.setMinimum(0);             // keine negativen Zahlen
-
-        // Instanzfelder befüllen (keine Schattenvariablen!)
-        minField = new JFormattedTextField(formatterNumbers);
-        ((JFormattedTextField) minField).setColumns(10);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1.0;
-        panel.add(minField, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0;
-        panel.add(new JLabel("MB"), gbc);
-
-        // Max File Size
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Max File Size:"), gbc);
-
-        maxField = new JFormattedTextField(formatterNumbers);
-        ((JFormattedTextField) maxField).setColumns(10);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1.0;
-        panel.add(maxField, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0;
-        panel.add(new JLabel("MB"), gbc);
-
-        // File Extensions
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
-        panel.add(new JLabel("File Extentions (divided by ', ')"), gbc);
-
-        DefaultFormatter formatterText = new DefaultFormatter();
-        formatterText.setOverwriteMode(false); // Eingaben anhängen statt überschreiben
-        formatterText.setAllowsInvalid(true);  // freie Texteingabe
-
-        fileExtention = new JFormattedTextField(formatterText);
-        ((JFormattedTextField) fileExtention).setColumns(10);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1.0;
-        panel.add(fileExtention, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0;
-        panel.add(new JLabel(""), gbc); // (hier war zuvor "MB" – für Extensions nicht nötig)
-
-        // Checkboxes
-        gbc.gridx = 0;
-        gbc.gridwidth = 2;
-        gbc.weightx = 1.0;
-
-        gbc.gridy = ++row; panel.add(chkFileSize, gbc);
-        gbc.gridy = ++row; panel.add(chkFileName, gbc);
-        gbc.gridy = ++row; panel.add(chkSubFolder, gbc);
-        gbc.gridy = ++row; panel.add(chkFileExtention, gbc);
-
-        // Spacer
-        gbc.gridy = ++row;
-        gbc.weighty = 1.0;
-        gbc.fill = GridBagConstraints.BOTH;
-        panel.add(Box.createVerticalGlue(), gbc);
-
-        // Button Panel
-        JPanel buttonPanel = new JPanel(new BorderLayout());
-
-        // Save Button mit ActionListener
-        JButton btnSave = new JButton("Save Settings");
-        btnSave.addActionListener(e -> {
-            try {
-                double min = 0;
-                double max = 0;
-                String fileExt = "";
-
-                String minText = minField.getText().trim();
-                if (!minText.isEmpty()) min = Double.parseDouble(minText);
-
-                String maxText = maxField.getText().trim();
-                if (!maxText.isEmpty()) max = Double.parseDouble(maxText);
-
-                String fExtTxt = fileExtention.getText().trim();
-                if (!fExtTxt.isEmpty()) fileExt = fExtTxt;
-
-                boolean fileSize = chkFileSize.isSelected();
-                boolean fileName = chkFileName.isSelected();
-                boolean subFolder = chkSubFolder.isSelected();
-                boolean fExtention = chkFileExtention.isSelected();
-
-                XMLController.saveSettingsToXML(min, max, fileExt, fileSize, fileName, subFolder, fExtention);
-
-                JOptionPane.showMessageDialog(panel, "Einstellungen gespeichert!",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
-
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(panel,
-                        "Bitte gültige Zahlen eingeben!",
-                        "Fehler", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-
-        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        leftButtons.add(btnSave);
-        leftButtons.add(new JButton("Reset"));
-
-        JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
-        rightButtons.add(new JButton("Start"));
-
-        buttonPanel.add(leftButtons, BorderLayout.WEST);
-        buttonPanel.add(rightButtons, BorderLayout.EAST);
-
-        gbc.gridy = ++row;
-        gbc.gridx = 0;
-        gbc.gridwidth = 3;
-        gbc.weighty = 0.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.SOUTH;
-        panel.add(buttonPanel, gbc);
-
-        return panel;
     }
 
     private JMenuBar createMenuBar() {
@@ -317,14 +172,14 @@ public class MainScreenView extends JFrame {
         return menuBar;
     }
 
-    // Hilfsmethode: Settings in UI eintragen
-    private void applySettings(double min, double max, String ext, boolean fileSize, boolean fileName, boolean subFolder, boolean fExt) {
-        minField.setText(String.valueOf(min));
-        maxField.setText(String.valueOf(max));
-        fileExtention.setText(ext);
-        chkFileSize.setSelected(fileSize);
-        chkFileName.setSelected(fileName);
-        chkSubFolder.setSelected(subFolder);
-        chkFileExtention.setSelected(fExt);
+    // Hilfsmethode: Settings in UI eintragen (delegiert an den aktiven Options-Frame für Duplikatsuche)
+    private void applySettings(double min, double max, String ext,
+                               boolean fileSize, boolean fileName,
+                               boolean subFolder, boolean fExt) {
+        if (duplicateOptionsPanel != null) {
+            duplicateOptionsPanel.applySettings(min, max, ext, fileSize, fileName, subFolder, fExt);
+            // Optional: gleich auf den passenden Reiter springen
+            optionsTabs.setSelectedComponent(duplicateOptionsPanel);
+        }
     }
 }
