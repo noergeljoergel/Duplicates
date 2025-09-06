@@ -98,7 +98,14 @@ public class MainScreenView extends JFrame {
 
         // Reiter 3: Info (zentrierter Text)
         JPanel infoPanel = new JPanel(new BorderLayout());
-        JLabel infoLabel = new JLabel("Copyright Jörg Hesse 2025", SwingConstants.CENTER);
+        JLabel infoLabel = new JLabel(
+        	    "<html><div style='text-align:center;'>Duplicates v0.1<br><br>Dies ist ein Tool, zum Suchen nach Dateiduplikaten oder zum Suchen nach Dateien nach bestimmten Kriterien <br><br>&#169; Jörg Hesse</div></html>",
+        	    SwingConstants.CENTER
+        	);
+
+   		
+        
+        
         infoPanel.add(infoLabel, BorderLayout.CENTER);
         optionsTabs.addTab("Info", infoPanel);
 
@@ -161,7 +168,7 @@ public class MainScreenView extends JFrame {
         JMenu helpMenu = new JMenu("Help");
         JMenuItem aboutItem = new JMenuItem("About Duplicates...");
         aboutItem.addActionListener(e ->
-                JOptionPane.showMessageDialog(this, "Duplicates v1.0\nAutor: Jörg Hesse",
+                JOptionPane.showMessageDialog(this, "Duplicates v0.1\n\n© Jörg Hesse",
                         "Über Duplicates", JOptionPane.INFORMATION_MESSAGE));
         helpMenu.add(aboutItem);
 
