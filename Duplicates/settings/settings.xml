@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <Settings>
   <minFileSize MB="0.0"/>
-  <maxFileSize MB="345.67"/>
-  <FileExtentions ext="sfafgsagg"/>
-  <FileSize On="true"/>
+  <maxFileSize MB="0.0"/>
+  <FileExtentions ext=""/>
+  <FileSize On="false"/>
   <FileName On="false"/>
-  <SubFolder On="true"/>
+  <SubFolder On="false"/>
   <FileExtentionBoolean On="false"/>
 </Settings>
