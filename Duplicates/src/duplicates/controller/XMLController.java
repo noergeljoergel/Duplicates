@@ -1,13 +1,13 @@
 package duplicates.controller;
 
 import java.io.File;
+import java.time.LocalDate;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -16,11 +16,15 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import duplicates.model.FileSearchOptionsModel;
+import duplicates.model.DuplicateSearchOptionsModel;
+
 
 // stores saveGame-Data in XML-format
 public class XMLController {
 	// Filepaths
-	private static String settingsPath = "settings/settings.xml";
+	private static String dsSettingsPath = "settings/DSsettings.xml";
+	private static String fsSettingsPath = "settings/FSsettings.xml";
 //	private GameState gameState;
 
 //	public XMLController(GameState gameState) {
@@ -35,156 +39,309 @@ public class XMLController {
 	 * @param maxFileSize - float - Volume for SFX 
 	 * @param resX - int - horizontal screen resolution  
 	 * @param resY - int - vertical screen resolution
-	 * @param fileSize - boolean - true if full screen mode is used
+	 * @param fileSizeBoo - boolean - true if full screen mode is used
 	 * @author Jörg
 	 */
-	public static void saveSettingsToXML(double minFileSize, double maxFileSize, String fileExtention, boolean fileSize, boolean fileName, boolean subFolder, boolean fileExtentionBoolean) {
-		new File(settingsPath);
-	
-		DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-		DocumentBuilder documentBuilder;
-		try {
-			
-			String outPut = minFileSize + " - " + maxFileSize + " - " + fileExtention + " - " + fileSize + " - " + fileName + " - " + subFolder + " - " + fileExtentionBoolean;
-			System.out.println(outPut);
-			
-			
-			documentBuilder = documentBuilderFactory.newDocumentBuilder();
-			Document doc = documentBuilder.newDocument();
-
-			// root element für settings
-			Element rootElement = doc.createElement("Settings");
-			doc.appendChild(rootElement);
-
-			// minimale Dateigröße
-			Element minSize = doc.createElement("minFileSize");
-			minSize.setAttribute("MB", String.valueOf(minFileSize));
-			rootElement.appendChild(minSize);
-
-			// maximale Dateigröße
-			Element maxSize = doc.createElement("maxFileSize");
-			maxSize.setAttribute("MB", String.valueOf(maxFileSize));
-			rootElement.appendChild(maxSize);
-
-			// Liste der Dateierweiterungen als String
-			Element fExt = doc.createElement("FileExtentions");
-			fExt.setAttribute("ext", fileExtention);
-			rootElement.appendChild(fExt);
-			
-			// FileSize
-			Element fSize = doc.createElement("FileSize");
-			fSize.setAttribute("On", String.valueOf(fileSize));
-			rootElement.appendChild(fSize);
-			
-			// FileName
-			Element fname = doc.createElement("FileName");
-			fname.setAttribute("On", String.valueOf(fileName));
-			rootElement.appendChild(fname);
-			
-			// SubFolder
-			Element sFolder = doc.createElement("SubFolder");
-			sFolder.setAttribute("On", String.valueOf(subFolder));
-			rootElement.appendChild(sFolder);
-			
-			// FileExtention
-			Element fExtention = doc.createElement("FileExtentionBoolean");
-			fExtention.setAttribute("On", String.valueOf(fileExtentionBoolean));
-			rootElement.appendChild(fExtention);			
-			
-		// write contents into file
-			TransformerFactory tf = TransformerFactory.newInstance();
-			Transformer transformer = tf.newTransformer();
-			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
-
-			File file = new File(settingsPath);
-			file.getParentFile().mkdirs();
-			transformer.transform(new DOMSource(doc), new StreamResult(file));
-
-			System.out.println("Settings gespeichert unter: " + file.getAbsolutePath());
-
-			// possible exceptions
-		} catch (ParserConfigurationException e) {
-			e.printStackTrace();
-		} catch (TransformerConfigurationException e) {
-			e.printStackTrace();
-		} catch (TransformerException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
 	
 	/**
-	 * reads settings from settings/settings.xml  
-	 * @Example 
-	 * Object[] settings = xmlController.readSettingsFromXML();
-	 * 
-     *	if (settings != null) {
-     *       float soundVolume   = (float) settings[0];
-     *       float sfxVolume     = (float) settings[1];
-     *       int resolutionX     = (int)   settings[2];
-     *       int resolutionY     = (int)   settings[3];
-     *       boolean fullscreen  = (boolean) settings[4];
-     *       System.out.println("Sound Volume: " + soundVolume);
-     *       System.out.println("SFX Volume: " + sfxVolume);
-     *       System.out.println("Resolution: " + resolutionX + "x" + resolutionY);
-     *       System.out.println("Fullscreen: " + fullscreen);
-     *   }
-     *   
-     *
-	 * @return Object[] { float soundVolume, float sfxVolume, int resolutionX, int resolutionY, boolean fullScreen }
-	 * @author Christoph, Vladi, Jörg
+	 * Speicher die Duplicate-Suche Einstellungen in XML Datei
+	 * @param options
+	 * @author Jörg
 	 */
-	public static Object[] readSettingsFromXML() {
-		File settingsFile = new File(settingsPath);
+	public static void saveDSSettingsToXML(DuplicateSearchOptionsModel options) {
+	    new File(dsSettingsPath);
 
-		try {
-			if (!settingsFile.exists()) {
-				System.err.println("Settings Datei nicht gefunden!" + settingsFile.getAbsolutePath());
-				return null;
-			}
-			DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-			Document doc = documentBuilder.parse(settingsFile);
-			doc.getDocumentElement().normalize();
+	    DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+	    try {
+	        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+	        Document doc = documentBuilder.newDocument();
 
-			Element rootElement = doc.getDocumentElement();
+	        Element rootElement = doc.createElement("Settings");
+	        doc.appendChild(rootElement);
 
-			// minFileSize
-			Element minSize = (Element) rootElement.getElementsByTagName("minFileSize").item(0);
-			double minFileSize = Double.parseDouble(minSize.getAttribute("MB"));
-			
-			//  maxFileSize
-			Element maxSize = (Element) rootElement.getElementsByTagName("maxFileSize").item(0);
-			double maxFileSize = Double.parseDouble(maxSize.getAttribute("MB"));
-						
-			//  Liste der Dateierweiterungen als String
-			Element fExt = (Element) rootElement.getElementsByTagName("FileExtentions").item(0);
-			String fileExt = fExt.getAttribute("ext");
+	        // 1: Min / Max Size
+	        Element minSize = doc.createElement("MinFileSize");
+	        minSize.setAttribute("MB", String.valueOf(options.getMinFileSize()));
+	        rootElement.appendChild(minSize);
 
-			// FileSize
-			Element fSize = (Element) rootElement.getElementsByTagName("FileSize").item(0);
-			boolean fileSize = Boolean.parseBoolean(fSize.getAttribute("On"));
-			
-			// FileName
-			Element fName = (Element) rootElement.getElementsByTagName("FileName").item(0);
-			boolean fileName = Boolean.parseBoolean(fName.getAttribute("On"));
-			
-			// SubFolder
-			Element sFolder = (Element) rootElement.getElementsByTagName("SubFolder").item(0);
-			boolean subFolder = Boolean.parseBoolean(sFolder.getAttribute("On"));
-			
-			// Dateierweiterungen als boolean
-			Element fExtB = (Element) rootElement.getElementsByTagName("FileExtentionBoolean").item(0);
-			boolean FileExtB = Boolean.parseBoolean(fExtB.getAttribute("On"));
-			
-			System.out.println("Einstellungen geladen von: " + settingsFile.getAbsolutePath());
-			return new Object[] { minFileSize, maxFileSize, fileExt, fileSize, fileName, subFolder, FileExtB};
+	        Element maxSize = doc.createElement("MaxFileSize");
+	        maxSize.setAttribute("MB", String.valueOf(options.getMaxFileSize()));
+	        rootElement.appendChild(maxSize);
 
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.err.println("Fehler beim lesen der Datei!");
-			return null;
-		}
-	}      
+	        // 2: File Extensions & Name
+	        Element fExt = doc.createElement("FileExtensions");
+	        fExt.setAttribute("ext", options.getFileExtention() != null ? options.getFileExtention() : "");
+	        rootElement.appendChild(fExt);
+
+	        Element fNameString = doc.createElement("FileNameString");
+	        fNameString.setAttribute("value", options.getFileNameString() != null ? options.getFileNameString() : "");
+	        rootElement.appendChild(fNameString);
+
+	        // 3: Creation Date Operator + Date
+	        Element createdOp = doc.createElement("CreationDateOperator");
+	        createdOp.setAttribute("op", options.getFileCreationDateOperator() != null ? options.getFileCreationDateOperator() : "");
+	        rootElement.appendChild(createdOp);
+
+	        Element created = doc.createElement("CreationDate");
+	        created.setAttribute("value", options.getCreationDate() != null ? options.getCreationDate().toString() : "");
+	        rootElement.appendChild(created);
+
+	        // 4: Modification Date Operator + Date
+	        Element modifiedOp = doc.createElement("ModificationDateOperator");
+	        modifiedOp.setAttribute("op", options.getFileModificationDateOperator() != null ? options.getFileModificationDateOperator() : "");
+	        rootElement.appendChild(modifiedOp);
+
+	        Element modified = doc.createElement("ModificationDate");
+	        modified.setAttribute("value", options.getModificationDate() != null ? options.getModificationDate().toString() : "");
+	        rootElement.appendChild(modified);
+
+	        // 5: Booleans
+	        Element fSize = doc.createElement("FileSize");
+	        fSize.setAttribute("On", String.valueOf(options.isFileSizeBoo()));
+	        rootElement.appendChild(fSize);
+
+	        Element fName = doc.createElement("FileName");
+	        fName.setAttribute("On", String.valueOf(options.isFileNameBoo()));
+	        rootElement.appendChild(fName);
+
+	        Element fExtBool = doc.createElement("FileExtensionBoolean");
+	        fExtBool.setAttribute("On", String.valueOf(options.isFileExtentionBoo()));
+	        rootElement.appendChild(fExtBool);
+
+	        Element sFolder = doc.createElement("SubFolder");
+	        sFolder.setAttribute("On", String.valueOf(options.isSubFolderBoo()));
+	        rootElement.appendChild(sFolder);
+
+	        // XML schreiben
+	        TransformerFactory tf = TransformerFactory.newInstance();
+	        Transformer transformer = tf.newTransformer();
+	        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+	        transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+
+	        File file = new File(dsSettingsPath);
+	        file.getParentFile().mkdirs();
+	        transformer.transform(new DOMSource(doc), new StreamResult(file));
+
+	        System.out.println("Settings gespeichert unter: " + file.getAbsolutePath());
+
+	    } catch (ParserConfigurationException | TransformerException e) {
+	        e.printStackTrace();
+	    }
+	}
+
+	
+	
+	
+	public static void saveFSSettingsToXML(FileSearchOptionsModel options) {
+	    new File(fsSettingsPath);
+
+	    DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+	    try {
+	        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+	        Document doc = documentBuilder.newDocument();
+
+	        Element rootElement = doc.createElement("Settings");
+	        doc.appendChild(rootElement);
+
+	        // 1: Min / Max Size
+	        Element minSize = doc.createElement("MinFileSize");
+	        minSize.setAttribute("MB", String.valueOf(options.getMinFileSize()));
+	        rootElement.appendChild(minSize);
+
+	        Element maxSize = doc.createElement("MaxFileSize");
+	        maxSize.setAttribute("MB", String.valueOf(options.getMaxFileSize()));
+	        rootElement.appendChild(maxSize);
+
+	        // 2: File Extensions & Name
+	        Element fExt = doc.createElement("FileExtensions");
+	        fExt.setAttribute("ext", options.getFileExtention() != null ? options.getFileExtention() : "");
+	        rootElement.appendChild(fExt);
+
+	        Element fNameString = doc.createElement("FileNameString");
+	        fNameString.setAttribute("value", options.getFileNameString() != null ? options.getFileNameString() : "");
+	        rootElement.appendChild(fNameString);
+
+	        // 3: Creation Date Operator + Date
+	        Element createdOp = doc.createElement("CreationDateOperator");
+	        createdOp.setAttribute("op", options.getFileCreationDateOperator() != null ? options.getFileCreationDateOperator() : "");
+	        rootElement.appendChild(createdOp);
+
+	        Element created = doc.createElement("CreationDate");
+	        created.setAttribute("value", options.getCreationDate() != null ? options.getCreationDate().toString() : "");
+	        rootElement.appendChild(created);
+
+	        // 4: Modification Date Operator + Date
+	        Element modifiedOp = doc.createElement("ModificationDateOperator");
+	        modifiedOp.setAttribute("op", options.getFileModificationDateOperator() != null ? options.getFileModificationDateOperator() : "");
+	        rootElement.appendChild(modifiedOp);
+
+	        Element modified = doc.createElement("ModificationDate");
+	        modified.setAttribute("value", options.getModificationDate() != null ? options.getModificationDate().toString() : "");
+	        rootElement.appendChild(modified);
+
+	        // 5: Include Subfolders
+	        Element sFolder = doc.createElement("SubFolder");
+	        sFolder.setAttribute("On", String.valueOf(options.isSubFolderBoo()));
+	        rootElement.appendChild(sFolder);
+
+	        // XML schreiben
+	        TransformerFactory tf = TransformerFactory.newInstance();
+	        Transformer transformer = tf.newTransformer();
+	        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+	        transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+
+	        File file = new File(fsSettingsPath);
+	        file.getParentFile().mkdirs();
+	        transformer.transform(new DOMSource(doc), new StreamResult(file));
+
+	        System.out.println("Dateisuche-Settings gespeichert unter: " + file.getAbsolutePath());
+
+	    } catch (ParserConfigurationException | TransformerException e) {
+	        e.printStackTrace();
+	    }
+	}
+	
+	
+	
+	
+	
+	public static DuplicateSearchOptionsModel readDSSettingsFromXML() {
+	    File settingsFile = new File(dsSettingsPath);
+
+	    try {
+	        if (!settingsFile.exists()) {
+	            System.err.println("Settings Datei nicht gefunden! " + settingsFile.getAbsolutePath());
+	            return null;
+	        }
+
+	        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+	        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+	        Document doc = documentBuilder.parse(settingsFile);
+	        doc.getDocumentElement().normalize();
+
+	        Element rootElement = doc.getDocumentElement();
+
+	        DuplicateSearchOptionsModel options = new DuplicateSearchOptionsModel();
+
+	        // 1: Min / Max Size
+	        Element minSize = (Element) rootElement.getElementsByTagName("MinFileSize").item(0);
+	        options.setMinFileSize(Double.parseDouble(minSize.getAttribute("MB")));
+
+	        Element maxSize = (Element) rootElement.getElementsByTagName("MaxFileSize").item(0);
+	        options.setMaxFileSize(Double.parseDouble(maxSize.getAttribute("MB")));
+
+	        // 2: File Extensions & Name
+	        Element fExt = (Element) rootElement.getElementsByTagName("FileExtensions").item(0);
+	        options.setFileExtention(fExt.getAttribute("ext"));
+
+	        Element fNameString = (Element) rootElement.getElementsByTagName("FileNameString").item(0);
+	        options.setFileNameString(fNameString.getAttribute("value"));
+
+	        // 3: Creation Date Operator + Date
+	        Element createdOp = (Element) rootElement.getElementsByTagName("CreationDateOperator").item(0);
+	        options.setFileCreationDateOperator(createdOp != null ? createdOp.getAttribute("op") : "");
+
+	        Element created = (Element) rootElement.getElementsByTagName("CreationDate").item(0);
+	        String creationDateStr = created != null ? created.getAttribute("value") : "";
+	        if (creationDateStr != null && !creationDateStr.isBlank()) {
+	            options.setCreationDate(LocalDate.parse(creationDateStr));
+	        }
+
+	        // 4: Modification Date Operator + Date
+	        Element modifiedOp = (Element) rootElement.getElementsByTagName("ModificationDateOperator").item(0);
+	        options.setFileModificationDateOperator(modifiedOp != null ? modifiedOp.getAttribute("op") : "");
+
+	        Element modified = (Element) rootElement.getElementsByTagName("ModificationDate").item(0);
+	        String modificationDateStr = modified != null ? modified.getAttribute("value") : "";
+	        if (modificationDateStr != null && !modificationDateStr.isBlank()) {
+	            options.setModificationDate(LocalDate.parse(modificationDateStr));
+	        }
+
+	        // 5: Booleans
+	        Element fSize = (Element) rootElement.getElementsByTagName("FileSize").item(0);
+	        options.setFileSizeBoo(Boolean.parseBoolean(fSize.getAttribute("On")));
+
+	        Element fName = (Element) rootElement.getElementsByTagName("FileName").item(0);
+	        options.setFileNameBoo(Boolean.parseBoolean(fName.getAttribute("On")));
+
+	        Element fExtBool = (Element) rootElement.getElementsByTagName("FileExtensionBoolean").item(0);
+	        options.setFileExtentionBoo(Boolean.parseBoolean(fExtBool.getAttribute("On")));
+
+	        Element sFolder = (Element) rootElement.getElementsByTagName("SubFolder").item(0);
+	        options.setSubFolderBoo(Boolean.parseBoolean(sFolder.getAttribute("On")));
+
+	        System.out.println("Einstellungen geladen von: " + settingsFile.getAbsolutePath());
+	        return options;
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        System.err.println("Fehler beim Lesen der Datei!");
+	        return null;
+	    }
+	} 
+	public static FileSearchOptionsModel readFSSettingsFromXML() {
+	    File settingsFile = new File(fsSettingsPath);
+
+	    try {
+	        if (!settingsFile.exists()) {
+	            System.err.println("FS-Settings Datei nicht gefunden! " + settingsFile.getAbsolutePath());
+	            return null;
+	        }
+
+	        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+	        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+	        Document doc = documentBuilder.parse(settingsFile);
+	        doc.getDocumentElement().normalize();
+
+	        Element rootElement = doc.getDocumentElement();
+
+	        FileSearchOptionsModel options = new FileSearchOptionsModel();
+
+	        // 1: Min / Max Size
+	        Element minSize = (Element) rootElement.getElementsByTagName("MinFileSize").item(0);
+	        options.setMinFileSize(Double.parseDouble(minSize.getAttribute("MB")));
+
+	        Element maxSize = (Element) rootElement.getElementsByTagName("MaxFileSize").item(0);
+	        options.setMaxFileSize(Double.parseDouble(maxSize.getAttribute("MB")));
+
+	        // 2: File Extensions & Name
+	        Element fExt = (Element) rootElement.getElementsByTagName("FileExtensions").item(0);
+	        options.setFileExtention(fExt.getAttribute("ext"));
+
+	        Element fNameString = (Element) rootElement.getElementsByTagName("FileNameString").item(0);
+	        options.setFileNameString(fNameString.getAttribute("value"));
+
+	        // 3: Creation Date Operator + Date
+	        Element createdOp = (Element) rootElement.getElementsByTagName("CreationDateOperator").item(0);
+	        options.setFileCreationDateOperator(createdOp != null ? createdOp.getAttribute("op") : "");
+
+	        Element created = (Element) rootElement.getElementsByTagName("CreationDate").item(0);
+	        String creationDateStr = created != null ? created.getAttribute("value") : "";
+	        if (creationDateStr != null && !creationDateStr.isBlank()) {
+	            options.setCreationDate(LocalDate.parse(creationDateStr));
+	        }
+
+	        // 4: Modification Date Operator + Date
+	        Element modifiedOp = (Element) rootElement.getElementsByTagName("ModificationDateOperator").item(0);
+	        options.setFileModificationDateOperator(modifiedOp != null ? modifiedOp.getAttribute("op") : "");
+
+	        Element modified = (Element) rootElement.getElementsByTagName("ModificationDate").item(0);
+	        String modificationDateStr = modified != null ? modified.getAttribute("value") : "";
+	        if (modificationDateStr != null && !modificationDateStr.isBlank()) {
+	            options.setModificationDate(LocalDate.parse(modificationDateStr));
+	        }
+
+	        // 5: Include Subfolders
+	        Element sFolder = (Element) rootElement.getElementsByTagName("SubFolder").item(0);
+	        options.setSubFolderBoo(Boolean.parseBoolean(sFolder.getAttribute("On")));
+
+	        System.out.println("FS-Einstellungen geladen von: " + settingsFile.getAbsolutePath());
+	        return options;
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        System.err.println("Fehler beim Lesen der FS-Settings Datei!");
+	        return null;
+	    }
+	}
 }
