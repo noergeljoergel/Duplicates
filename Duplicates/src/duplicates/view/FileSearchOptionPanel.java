@@ -204,7 +204,13 @@ public class FileSearchOptionPanel extends JPanel {
     private void handleStart() {
         try {
             FileSearchOptionsModel model = toModel();
-            System.out.println("[DEBUG] FileSearch gestartet mit: " + model);
+
+            SwingUtilities.invokeLater(() -> {
+                FileSearchScreenView searchView = new FileSearchScreenView(model);
+                searchView.setVisible(true);
+                searchView.startSearch(); // -> Platzhalter-Aufruf für die spätere Suche
+            });
+
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this,
                     "Fehler beim Start: " + ex.getMessage(),
