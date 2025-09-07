@@ -185,7 +185,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
 
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
         JButton btnStart = new JButton("Start");
-        // noch keine Funktion → bleibt leer
+        btnStart.addActionListener(e -> handleStart());
         rightButtons.add(btnStart);
 
         buttonPanel.add(leftButtons, BorderLayout.WEST);
@@ -224,6 +224,24 @@ public class DuplicateSearchOptionPanel extends JPanel {
                     "Fehler", JOptionPane.ERROR_MESSAGE);
         }
     }
+    
+    private void handleStart() {
+        try {
+            DuplicateSearchOptionsModel model = toModel();
+
+            SwingUtilities.invokeLater(() -> {
+                DuplicateSearchScreenView searchView = new DuplicateSearchScreenView(model);
+                searchView.setVisible(true);
+                searchView.startSearch(); // Platzhalter für späteren Algorithmus
+            });
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Fehler beim Start: " + ex.getMessage(),
+                    "Fehler", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
 
     private void resetFields() {
         minField.setValue(null);
