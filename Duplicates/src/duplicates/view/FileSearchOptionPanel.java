@@ -170,7 +170,7 @@ public class FileSearchOptionPanel extends JPanel {
         leftButtons.add(btnReset);
 
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
-        JButton btnStart = new JButton("Starten");
+        JButton btnStart = new JButton("Start");
         btnStart.addActionListener(e -> handleStart());
         rightButtons.add(btnStart);
 

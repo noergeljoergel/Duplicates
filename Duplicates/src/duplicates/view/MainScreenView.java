@@ -6,6 +6,8 @@ import duplicates.model.DuplicateSearchOptionsModel;
 import duplicates.model.FileSearchOptionsModel;
 import duplicates.model.FolderTreeModel;
 
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.*;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
@@ -27,6 +29,19 @@ public class MainScreenView extends JFrame {
 
     public MainScreenView() {
         super("Duplicates – Dateisuche");
+        try {
+            // --- 1. Setze Look and Feel auf Windows
+            UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (UnsupportedLookAndFeelException e) {
+            e.printStackTrace();
+        }
+        
         setSize(1000, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
