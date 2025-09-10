@@ -7,7 +7,6 @@ import duplicates.model.FileSearchOptionsModel;
 import duplicates.model.FolderTreeModel;
 
 import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.*;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
@@ -32,17 +31,11 @@ public class MainScreenView extends JFrame {
         try {
             // --- 1. Setze Look and Feel auf Windows
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (UnsupportedLookAndFeelException e) {
+        } catch(Exception e) {
             e.printStackTrace();
         }
         
-        setSize(1000, 700);
+        setSize(800, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -99,13 +92,13 @@ public class MainScreenView extends JFrame {
         duplicateOptionsPanel = new DuplicateSearchOptionPanel();
         optionsTabs.addTab("Duplicate Search", duplicateOptionsPanel);
 
-        fileSearchOptionsPanel = new FileSearchOptionPanel();
+        fileSearchOptionsPanel = new FileSearchOptionPanel(this);
         optionsTabs.addTab("File Search", fileSearchOptionsPanel);
 
         JPanel infoPanel = new JPanel(new BorderLayout());
         JLabel infoLabel = new JLabel(
                 "<html><div style='text-align:center;'>Duplicates v0.1<br><br>" +
-                        "Tool zum Suchen nach Dateiduplikaten oder Dateien mit Kriterien<br><br>&#169; Jörg Hesse</div></html>",
+                        "Tool zum Suchen nach Dateiduplikaten oder Dateien<br><br>&#169; Jörg Hesse</div></html>",
                 SwingConstants.CENTER);
         infoPanel.add(infoLabel, BorderLayout.CENTER);
         optionsTabs.addTab("Info", infoPanel);
@@ -205,7 +198,7 @@ public class MainScreenView extends JFrame {
     }
 
     /** Hilfsmethode: ausgewählte Ordner holen */
-    private List<String> getSelectedFolders() {
+    public List<String> getSelectedFolders() {
         List<String> list = new ArrayList<>();
         for (int i = 0; i < selectedFoldersModel.size(); i++) {
             list.add(selectedFoldersModel.get(i));

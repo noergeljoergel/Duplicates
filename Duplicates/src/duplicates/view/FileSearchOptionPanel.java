@@ -10,13 +10,18 @@ import javax.swing.text.NumberFormatter;
 import java.awt.*;
 import java.text.NumberFormat;
 import java.text.ParseException;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
+/**
+ * Panel für die Eingabe der Suchoptionen.
+ * Bietet Felder für Dateigröße, Filter, Datumsangaben etc.
+ */
 public class FileSearchOptionPanel extends JPanel {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.uuuu");
 
+    // --- Eingabefelder ---
     private JFormattedTextField minField;
     private JFormattedTextField maxField;
     private JFormattedTextField fileExtention;
@@ -27,8 +32,12 @@ public class FileSearchOptionPanel extends JPanel {
     private JFormattedTextField modificationDate;
     private JCheckBox chkSubFolder;
 
-    public FileSearchOptionPanel() {
+    // --- Referenz auf MainScreenView, um Ordnerliste auszulesen ---
+    private final MainScreenView mainScreenView;
+
+    public FileSearchOptionPanel(MainScreenView mainScreenView) {
         super(new BorderLayout(5, 5));
+        this.mainScreenView = mainScreenView;
 
         // --- Titel ---
         JLabel title = new JLabel("Suche nach Dateien");
@@ -36,14 +45,12 @@ public class FileSearchOptionPanel extends JPanel {
         title.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         add(title, BorderLayout.NORTH);
 
-        // --- Inneres Panel für Optionen ---
+        // --- Inneres Panel mit GridBagLayout ---
         JPanel centerPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 6, 4, 6);
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
 
         int row = 0;
 
@@ -150,7 +157,7 @@ public class FileSearchOptionPanel extends JPanel {
         centerPanel.add(chkSubFolder = new JCheckBox("Unterordner berücksichtigen"), gbc);
         gbc.gridwidth = 1;
 
-        // Panel oben links verankern
+        // --- Center Panel in Wrapper setzen ---
         JPanel wrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         wrapper.add(centerPanel);
         add(wrapper, BorderLayout.CENTER);
@@ -177,7 +184,6 @@ public class FileSearchOptionPanel extends JPanel {
         buttonPanel.add(leftButtons, BorderLayout.WEST);
         buttonPanel.add(rightButtons, BorderLayout.EAST);
 
-        // KORREKT: jetzt mit BorderLayout.SOUTH hinzufügen
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
@@ -201,14 +207,22 @@ public class FileSearchOptionPanel extends JPanel {
         }
     }
 
+    // --- Start-Button Eventhandler: erstellt das Suchfenster und startet die Suche
     private void handleStart() {
         try {
             FileSearchOptionsModel model = toModel();
 
+            List<String> selectedFolders = mainScreenView.getSelectedFolders();
+            if (selectedFolders.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "Bitte wähle mindestens einen Ordner aus, bevor du die Suche startest.",
+                        "Keine Ordner ausgewählt", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             SwingUtilities.invokeLater(() -> {
-                FileSearchScreenView searchView = new FileSearchScreenView(model);
+                FileSearchScreenView searchView = new FileSearchScreenView(model, selectedFolders);
                 searchView.setVisible(true);
-                searchView.startSearch(); // -> Platzhalter-Aufruf für die spätere Suche
             });
 
         } catch (Exception ex) {
@@ -218,6 +232,8 @@ public class FileSearchOptionPanel extends JPanel {
         }
     }
 
+
+    // --- Übertragene Einstellungen in UI anwenden
     public void applySettings(FileSearchOptionsModel model) {
         minField.setValue(model.getMinFileSize());
         maxField.setValue(model.getMaxFileSize());
@@ -230,6 +246,7 @@ public class FileSearchOptionPanel extends JPanel {
         chkSubFolder.setSelected(model.isSubFolderBoo());
     }
 
+    // --- Erstellt ein Model-Objekt aus den Eingaben
     public FileSearchOptionsModel toModel() {
         FileSearchOptionsModel model = new FileSearchOptionsModel();
         model.setMinFileSize(numberFrom(minField));
@@ -238,6 +255,7 @@ public class FileSearchOptionPanel extends JPanel {
         model.setFileNameString(fileNameString1.getText() != null ? fileNameString1.getText().trim() : "");
         model.setFileCreationDateOperator((String) createdDateOperator.getSelectedItem());
         model.setFileModificationDateOperator((String) modifiedDateOperator.getSelectedItem());
+        model.setSubFolderBoo(chkSubFolder.isSelected());
         return model;
     }
 

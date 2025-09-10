@@ -27,40 +27,47 @@ public class FileSearchController {
      * @param progressUpdater Callback für Fortschritt (0–100)
      * @return Liste aller gefundenen Dateien (falls vollständige Liste benötigt wird)
      */
-    public List<FileSearchModel> searchFiles(FileSearchOptionsModel options,
-                                             Consumer<FileSearchModel> resultConsumer,
-                                             IntConsumer progressUpdater) {
-        List<File> allFiles = new ArrayList<>();
+	// --- 1. Methode anpassen: mehrere Start-Ordner
+	public List<FileSearchModel> searchFiles(List<String> selectedFolders,
+	                                         FileSearchOptionsModel options,
+	                                         Consumer<FileSearchModel> resultConsumer,
+	                                         IntConsumer progressUpdater) {
 
-        // --- 1. Wurzelordner auslesen (du musst hier ggf. anpassen, wo die Ordner herkommen)
-        // Beispiel: du könntest deine gewählten Ordner aus dem Tree übernehmen
-        File root = new File(System.getProperty("user.home")); // ← Platzhalter: Home-Verzeichnis
-        collectFiles(root, allFiles, options.isSubFolderBoo());
+	    List<File> allFiles = new ArrayList<>();
 
-        int total = allFiles.size();
-        List<FileSearchModel> results = new ArrayList<>();
+	    // --- 1.1 Ordner iterieren und Dateien sammeln
+	    for (String folderPath : selectedFolders) {
+	        File root = new File(folderPath);
+	        if (root.exists() && root.isDirectory()) {
+	            collectFiles(root, allFiles, options.isSubFolderBoo());
+	        }
+	    }
 
-        int counter = 0;
-        for (File file : allFiles) {
-            if (!file.isFile()) continue; // Nur echte Dateien
+	    int total = allFiles.size();
+	    List<FileSearchModel> results = new ArrayList<>();
 
-            if (!matchesOptions(file, options)) {
-                counter++;
-                updateProgress(progressUpdater, counter, total);
-                continue;
-            }
+	    int counter = 0;
+	    for (File file : allFiles) {
+	        if (!file.isFile()) continue;
 
-            FileSearchModel model = new FileSearchModel(file);
-            results.add(model);
+	        if (!matchesOptions(file, options)) {
+	            counter++;
+	            updateProgress(progressUpdater, counter, total);
+	            continue;
+	        }
 
-            // Ergebnis sofort liefern (für Live-Update in der Tabelle)
-            resultConsumer.accept(model);
+	        FileSearchModel model = new FileSearchModel(file);
+	        results.add(model);
 
-            counter++;
-            updateProgress(progressUpdater, counter, total);
-        }
-        return results;
-    }
+	        // Sofort an UI liefern
+	        resultConsumer.accept(model);
+
+	        counter++;
+	        updateProgress(progressUpdater, counter, total);
+	    }
+	    return results;
+	}
+
 
     // --- 2. Dateien rekursiv sammeln ---
     private void collectFiles(File folder, List<File> allFiles, boolean includeSubfolders) {
