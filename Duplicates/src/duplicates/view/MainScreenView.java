@@ -6,7 +6,6 @@ import duplicates.model.DuplicateSearchOptionsModel;
 import duplicates.model.FileSearchOptionsModel;
 import duplicates.model.FolderTreeModel;
 
-import javax.swing.UIManager;
 import javax.swing.*;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
@@ -29,19 +28,18 @@ public class MainScreenView extends JFrame {
     public MainScreenView() {
         super("Duplicates – Dateisuche");
         try {
-            // --- 1. Setze Look and Feel auf Windows
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        
+
         setSize(800, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         setJMenuBar(createMenuBar());
 
-        // Tree
+        // --- Tree-Setup ---
         JTree folderTree = new JTree();
         FolderTreeModel treeModel = new FolderTreeModel(controller, folderTree);
         folderTree.setModel(treeModel);
@@ -54,7 +52,8 @@ public class MainScreenView extends JFrame {
         folderTree.setRowHeight(0);
 
         treeModel.addTreeModelListener(new TreeModelListener() {
-            @Override public void treeNodesChanged(TreeModelEvent e) {
+            @Override
+            public void treeNodesChanged(TreeModelEvent e) {
                 Object[] children = e.getChildren();
                 if (children == null || children.length == 0) {
                     handleNode(e.getTreePath().getLastPathComponent());
@@ -62,6 +61,7 @@ public class MainScreenView extends JFrame {
                     for (Object child : children) handleNode(child);
                 }
             }
+
             @Override public void treeNodesInserted(TreeModelEvent e) {}
             @Override public void treeNodesRemoved(TreeModelEvent e) {}
             @Override public void treeStructureChanged(TreeModelEvent e) {}
@@ -86,10 +86,11 @@ public class MainScreenView extends JFrame {
 
         JScrollPane treeScroll = new JScrollPane(folderTree);
 
-        // Tabs
+        // --- Tabs erstellen ---
         optionsTabs = new JTabbedPane();
 
-        duplicateOptionsPanel = new DuplicateSearchOptionPanel();
+        // WICHTIG: Feld duplicateOptionsPanel initialisieren!
+        duplicateOptionsPanel = new DuplicateSearchOptionPanel(this);
         optionsTabs.addTab("Duplicate Search", duplicateOptionsPanel);
 
         fileSearchOptionsPanel = new FileSearchOptionPanel(this);
@@ -206,3 +207,4 @@ public class MainScreenView extends JFrame {
         return list;
     }
 }
+
