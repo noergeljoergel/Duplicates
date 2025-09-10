@@ -13,12 +13,14 @@ import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
+import java.util.List;
 
 public class DuplicateSearchOptionPanel extends JPanel {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("dd.MM.uuuu").withResolverStyle(ResolverStyle.STRICT);
 
+    // --- Eingabefelder ---
     private JFormattedTextField minField;
     private JFormattedTextField maxField;
     private JFormattedTextField fileExtention;
@@ -32,8 +34,12 @@ public class DuplicateSearchOptionPanel extends JPanel {
     private JCheckBox chkSubFolder;
     private JCheckBox chkFileExtention;
 
-    public DuplicateSearchOptionPanel() {
+    // --- Referenz auf MainScreenView, um Ordnerliste zu bekommen ---
+    private final MainScreenView mainScreenView;
+
+    public DuplicateSearchOptionPanel(MainScreenView mainScreenView) {
         super(new BorderLayout(5, 5));
+        this.mainScreenView = mainScreenView; // Referenz speichern
 
         // --- Titel ---
         JLabel title = new JLabel("Suche nach Duplikaten");
@@ -64,7 +70,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         formatterNumbers.setMinimum(0L);
 
         minField = new JFormattedTextField(formatterNumbers);
-        minField.setColumns(6);
+        minField.setColumns(12);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(minField, gbc);
@@ -77,7 +83,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         centerPanel.add(new JLabel("Max. Dateigröße (MB):"), gbc);
 
         maxField = new JFormattedTextField(formatterNumbers);
-        maxField.setColumns(6);
+        maxField.setColumns(12);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(maxField, gbc);
@@ -94,7 +100,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         formatterText.setAllowsInvalid(true);
 
         fileExtention = new JFormattedTextField(formatterText);
-        fileExtention.setColumns(6);
+        fileExtention.setColumns(12);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(fileExtention, gbc);
@@ -107,7 +113,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         centerPanel.add(new JLabel("Dateiname enthält:"), gbc);
 
         fileNameString1 = new JFormattedTextField(formatterText);
-        fileNameString1.setColumns(6);
+        fileNameString1.setColumns(12);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(fileNameString1, gbc);
@@ -168,7 +174,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         wrapper.add(centerPanel);
         add(wrapper, BorderLayout.CENTER);
 
-        // --- Button Panel (links Speichern/Laden/Reset, rechts Start) ---
+        // --- Button Panel ---
         JPanel buttonPanel = new JPanel(new BorderLayout());
 
         JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
@@ -224,15 +230,23 @@ public class DuplicateSearchOptionPanel extends JPanel {
                     "Fehler", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
+
     private void handleStart() {
         try {
             DuplicateSearchOptionsModel model = toModel();
 
+            List<String> selectedFolders = mainScreenView.getSelectedFolders();
+            if (selectedFolders.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "Bitte wähle mindestens einen Ordner aus, bevor du die Suche startest.",
+                        "Keine Ordner ausgewählt", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             SwingUtilities.invokeLater(() -> {
-                DuplicateSearchScreenView searchView = new DuplicateSearchScreenView(model);
+                DuplicateSearchScreenView searchView =
+                        new DuplicateSearchScreenView(model, selectedFolders);
                 searchView.setVisible(true);
-                searchView.startSearch(); // Platzhalter für späteren Algorithmus
             });
 
         } catch (Exception ex) {
@@ -241,7 +255,6 @@ public class DuplicateSearchOptionPanel extends JPanel {
                     "Fehler", JOptionPane.ERROR_MESSAGE);
         }
     }
-
 
     private void resetFields() {
         minField.setValue(null);
@@ -258,8 +271,6 @@ public class DuplicateSearchOptionPanel extends JPanel {
         chkFileExtention.setSelected(false);
     }
 
-    // applySettings(...) & toModel() bleiben wie in deiner letzten Version
-
     private JComboBox<String> createOpCombo() {
         JComboBox<String> combo = new JComboBox<>(new String[]{"<", "<=", "=", ">=", ">"});
         combo.setEditable(false);
@@ -268,54 +279,16 @@ public class DuplicateSearchOptionPanel extends JPanel {
     }
 
     private JFormattedTextField createStrictDateField() {
-        MaskFormatter mask;
         try {
-            mask = new MaskFormatter("##.##.####");
-            mask.setPlaceholderCharacter('_');        // sichtbarer Platzhalter
-            mask.setValidCharacters("0123456789");    // nur Ziffern erlaubt
+            MaskFormatter mask = new MaskFormatter("##.##.####");
+            mask.setPlaceholderCharacter('_');
+            mask.setValidCharacters("0123456789");
+            JFormattedTextField f = new JFormattedTextField(mask);
+            f.setFocusLostBehavior(JFormattedTextField.PERSIST);
+            return f;
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }
-
-        JFormattedTextField f = new JFormattedTextField(mask);
-        f.setColumns(10);
-
-        // WICHTIG: PERSIST verhindert automatisches Zurücksetzen beim Fokusverlust
-        f.setFocusLostBehavior(JFormattedTextField.PERSIST);
-
-        // Strenge Validierung: nur echtes Datum zulassen, sonst rot markieren
-        f.setInputVerifier(new InputVerifier() {
-            final DateTimeFormatter STRICT_FMT =
-                    DateTimeFormatter.ofPattern("dd.MM.uuuu")
-                            .withResolverStyle(ResolverStyle.STRICT);
-
-            @Override
-            public boolean verify(JComponent input) {
-                String s = ((JFormattedTextField) input).getText();
-                if (isDateBlank(s)) {
-                    input.setBackground(UIManager.getColor("TextField.background"));
-                    return true;
-                }
-                try {
-                    LocalDate.parse(s, STRICT_FMT);
-                    input.setBackground(UIManager.getColor("TextField.background"));
-                    return true;
-                } catch (Exception ex) {
-                    input.setBackground(new Color(255, 230, 230)); // leicht rot
-                    return false;
-                }
-            }
-
-            @Override
-            public boolean shouldYieldFocus(JComponent input) {
-                // Beep nur bei komplett falschem Wert
-                boolean ok = verify(input);
-                if (!ok) Toolkit.getDefaultToolkit().beep();
-                return true; // Fokus trotzdem wechseln lassen
-            }
-        });
-
-        return f;
     }
 
     private String normalizeDateString(String s) {
@@ -339,9 +312,9 @@ public class DuplicateSearchOptionPanel extends JPanel {
             return 0d;
         }
     }
- // --- UI → Model
-    public duplicates.model.DuplicateSearchOptionsModel toModel() {
-        duplicates.model.DuplicateSearchOptionsModel model = new duplicates.model.DuplicateSearchOptionsModel();
+
+    public DuplicateSearchOptionsModel toModel() {
+        DuplicateSearchOptionsModel model = new DuplicateSearchOptionsModel();
         model.setMinFileSize(numberFrom(minField));
         model.setMaxFileSize(numberFrom(maxField));
         model.setFileExtention(textOrEmpty(fileExtention));
@@ -350,13 +323,13 @@ public class DuplicateSearchOptionPanel extends JPanel {
         model.setFileCreationDateOperator((String) createdDateOperator.getSelectedItem());
         String createdStr = normalizeDateString(createdDateField.getText());
         if (!createdStr.isBlank()) {
-            model.setCreationDate(java.time.LocalDate.parse(createdStr, DATE_FMT));
+            model.setCreationDate(LocalDate.parse(createdStr, DATE_FMT));
         }
 
         model.setFileModificationDateOperator((String) modifiedDateOperator.getSelectedItem());
         String modifiedStr = normalizeDateString(modificationDate.getText());
         if (!modifiedStr.isBlank()) {
-            model.setModificationDate(java.time.LocalDate.parse(modifiedStr, DATE_FMT));
+            model.setModificationDate(LocalDate.parse(modifiedStr, DATE_FMT));
         }
 
         model.setSubFolderBoo(chkSubFolder.isSelected());
@@ -366,32 +339,27 @@ public class DuplicateSearchOptionPanel extends JPanel {
         return model;
     }
 
-    // --- Model → UI
-    public void applySettings(duplicates.model.DuplicateSearchOptionsModel model) {
+    public void applySettings(DuplicateSearchOptionsModel model) {
         if (model == null) return;
 
         minField.setValue(model.getMinFileSize());
         maxField.setValue(model.getMaxFileSize());
         fileExtention.setText(model.getFileExtention() != null ? model.getFileExtention() : "");
         fileNameString1.setText(model.getFileNameString() != null ? model.getFileNameString() : "");
-
         createdDateOperator.setSelectedItem(model.getFileCreationDateOperator() != null
                 ? model.getFileCreationDateOperator() : "=");
         createdDateField.setText(model.getCreationDate() != null
                 ? model.getCreationDate().format(DATE_FMT) : "");
-
         modifiedDateOperator.setSelectedItem(model.getFileModificationDateOperator() != null
                 ? model.getFileModificationDateOperator() : "=");
         modificationDate.setText(model.getModificationDate() != null
                 ? model.getModificationDate().format(DATE_FMT) : "");
-
         chkSubFolder.setSelected(model.isSubFolderBoo());
         chkFileSize.setSelected(model.isFileSizeBoo());
         chkFileName.setSelected(model.isFileNameBoo());
         chkFileExtention.setSelected(model.isFileExtentionBoo());
     }
 
-    // --- Helper
     private String textOrEmpty(JFormattedTextField f) {
         return f.getText() == null ? "" : f.getText().trim();
     }
