@@ -91,7 +91,7 @@ public class FileSearchOptionPanel extends JPanel {
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Dateiendungen (CSV):"), gbc);
+        centerPanel.add(new JLabel("Dateiendungen:"), gbc);
 
         DefaultFormatter formatterText = new DefaultFormatter();
         formatterText.setOverwriteMode(false);
@@ -297,6 +297,7 @@ public class FileSearchOptionPanel extends JPanel {
         modifiedDateOperator.setSelectedItem("=");
         modificationDate.setText("");
         chkSubFolder.setSelected(false);
+        mainScreenView.clearFolderSelection();
     }
 
     private void handleSave() {
