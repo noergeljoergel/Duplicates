@@ -93,7 +93,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Dateiendungen (CSV):"), gbc);
+        centerPanel.add(new JLabel("Dateiendungen:"), gbc);
 
         DefaultFormatter formatterText = new DefaultFormatter();
         formatterText.setOverwriteMode(false);
@@ -269,6 +269,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         chkFileSize.setSelected(false);
         chkFileName.setSelected(false);
         chkFileExtention.setSelected(false);
+        mainScreenView.clearFolderSelection();
     }
 
     private JComboBox<String> createOpCombo() {

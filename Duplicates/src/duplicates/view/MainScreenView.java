@@ -206,5 +206,15 @@ public class MainScreenView extends JFrame {
         }
         return list;
     }
+    public void clearFolderSelection() {
+        // --- 1. Selektierte Einträge in der Liste löschen ---
+        selectedFoldersModel.clear();
+
+        // --- 2. Alle Checkboxen im Tree auf "false" setzen ---
+        FolderTreeModel treeModel = (FolderTreeModel) ((JTree)((JScrollPane)((JSplitPane)getContentPane()
+                .getComponent(0)).getRightComponent()).getViewport().getView()).getModel();
+
+        treeModel.clearAllSelections(); // <- Neue Methode in FolderTreeModel nötig!
+    }
 }
 

@@ -106,4 +106,18 @@ public class FolderTreeModel extends DefaultTreeModel {
     public void rememberSelection(String absolutePath, boolean selected) {
         selectionCache.put(absolutePath, selected);
     }
+    public void clearAllSelections() {
+        clearNode((DefaultMutableTreeNode) getRoot());
+        nodeStructureChanged((DefaultMutableTreeNode) getRoot());
+    }
+
+    private void clearNode(DefaultMutableTreeNode node) {
+        Object uo = node.getUserObject();
+        if (uo instanceof duplicates.model.CheckBoxNode cbNode) {
+            cbNode.setSelected(false);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            clearNode((DefaultMutableTreeNode) node.getChildAt(i));
+        }
+    }
 }
