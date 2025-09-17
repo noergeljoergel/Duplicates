@@ -15,10 +15,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.List;
 
+/**
+ * UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+ * 
+ */
 public class DuplicateSearchOptionPanel extends JPanel {
 
-    private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("dd.MM.uuuu").withResolverStyle(ResolverStyle.STRICT);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.uuuu");
 
     // --- Eingabefelder ---
     private JFormattedTextField minField;
@@ -59,7 +62,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         // --- 1: Min File Size ---
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Min. Dateigröße (MB):"), gbc);
+        centerPanel.add(new JLabel("Min. Dateigröße (Byte):"), gbc);
 
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
         numberFormat.setGroupingUsed(true);
@@ -80,7 +83,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Max. Dateigröße (MB):"), gbc);
+        centerPanel.add(new JLabel("Max. Dateigröße (Byte):"), gbc);
 
         maxField = new JFormattedTextField(formatterNumbers);
         maxField.setColumns(12);
@@ -100,7 +103,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         formatterText.setAllowsInvalid(true);
 
         fileExtention = new JFormattedTextField(formatterText);
-        fileExtention.setColumns(12);
+        fileExtention.setColumns(23);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(fileExtention, gbc);

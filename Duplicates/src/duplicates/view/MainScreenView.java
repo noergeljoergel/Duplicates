@@ -28,11 +28,15 @@ public class MainScreenView extends JFrame {
     public MainScreenView() {
         super("Duplicates – Dateisuche");
         try {
-            UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
+        		UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+        // --- Fenster-Icon setzen ---
+        ImageIcon icon = new ImageIcon(getClass().getResource("/img/DuplicatesIcon.png"));
+        setIconImage(icon.getImage());
+                
         setSize(800, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);

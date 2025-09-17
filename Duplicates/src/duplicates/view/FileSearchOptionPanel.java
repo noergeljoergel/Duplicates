@@ -57,7 +57,7 @@ public class FileSearchOptionPanel extends JPanel {
         // --- Min File Size ---
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Min. Dateigröße (MB):"), gbc);
+        centerPanel.add(new JLabel("Min. Dateigröße (Byte):"), gbc);
 
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
         numberFormat.setGroupingUsed(true);
@@ -78,10 +78,10 @@ public class FileSearchOptionPanel extends JPanel {
         row++;
         gbc.gridy = row;
         gbc.gridx = 0;
-        centerPanel.add(new JLabel("Max. Dateigröße (MB):"), gbc);
+        centerPanel.add(new JLabel("Max. Dateigröße (Byte):"), gbc);
 
         maxField = new JFormattedTextField(formatterNumbers);
-        maxField.setColumns(12);
+        maxField.setColumns(23);
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         centerPanel.add(maxField, gbc);
