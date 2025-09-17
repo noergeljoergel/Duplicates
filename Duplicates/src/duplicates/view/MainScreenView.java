@@ -176,6 +176,8 @@ public class MainScreenView extends JFrame {
         JMenu viewMenu = new JMenu("View");
         JMenu helpMenu = new JMenu("Help");
         JMenuItem aboutItem = new JMenuItem("About Duplicates...");
+//		ImageIcon icon = new ImageIcon(getClass().getResource("/img/Krone.png"));
+//      JLabel iconLabel = new JLabel(icon);
         aboutItem.addActionListener(e ->
                 JOptionPane.showMessageDialog(this, "Duplicates v0.1\n\n© Jörg Hesse",
                         "Über Duplicates", JOptionPane.INFORMATION_MESSAGE));
