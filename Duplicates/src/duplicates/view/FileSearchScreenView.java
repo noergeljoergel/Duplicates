@@ -12,8 +12,10 @@ import java.awt.event.MouseEvent;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Vector;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.io.IOException;
 
 /**
  * Fenster für die Dateisuche.
@@ -31,7 +33,7 @@ public class FileSearchScreenView extends JFrame {
     private final JButton btnAbort;
     private final JButton btnDelete;
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private SwingWorker<Void, FileSearchModel> worker; // SwingWorker für asynchrone Suche
 
     /**
      * Konstruktor: Übergabe der Suchoptionen und der zu durchsuchenden Ordner.
@@ -144,8 +146,17 @@ public class FileSearchScreenView extends JFrame {
 
         add(mainPanel);
 
-        // --- 5. Events binden ---
-        btnAbort.addActionListener(e -> dispose());
+     // --- 5. Events binden ---
+        btnAbort.addActionListener(e -> {
+            if (worker != null && !worker.isDone()) {
+                worker.cancel(true);
+                controller.cancel(); // Controller-Abbruch
+                progressBar.setIndeterminate(false);
+                progressBar.setString("Abgebrochen");
+            }
+            // Fenster bleibt offen -> kein dispose()!
+        });
+
         btnDelete.addActionListener(e -> deleteSelectedFiles());
 
         // --- 6. Suche starten ---
@@ -185,18 +196,51 @@ public class FileSearchScreenView extends JFrame {
     }
 
     /**
-     * Startet die Suche asynchron.
+     * Startet die Suche asynchron mit SwingWorker.
      */
     private void startSearch() {
-        executor.submit(() -> {
-            controller.searchFiles(selectedFolders, options,
-                    this::addResultRow,
-                    this::updateProgress);
-            SwingUtilities.invokeLater(() -> {
+        progressBar.setValue(0);
+        progressBar.setIndeterminate(false);
+
+        worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() {
+                controller.searchFiles(
+                        selectedFolders,
+                        options,
+                        model -> {
+                            if (!isCancelled()) publish(model);
+                        },
+                        this::setProgress
+                );
+                return null;
+            }
+
+            @Override
+            protected void process(List<FileSearchModel> chunks) {
+                for (FileSearchModel model : chunks) {
+                    addResultRow(model);
+                }
+            }
+
+            @Override
+            protected void done() {
                 btnAbort.setVisible(false);
                 btnDelete.setEnabled(true);
-            });
+                progressBar.setIndeterminate(false);
+                progressBar.setValue(100);
+            }
+        };
+
+        // Fortschrittsanzeige verbinden
+        worker.addPropertyChangeListener(evt -> {
+            if ("progress".equals(evt.getPropertyName())) {
+                int value = (Integer) evt.getNewValue();
+                progressBar.setValue(value);
+            }
         });
+
+        worker.execute();
     }
 
     /**
@@ -212,17 +256,10 @@ public class FileSearchScreenView extends JFrame {
             row.add(model.getDisplayType());
             row.add(model.getCreationDate() != null ? model.getCreationDate().toString() : "-");
             row.add(model.getModificationDate() != null ? model.getModificationDate().toString() : "-");
-            row.add(model.getFile().isFile() && !model.getFile().canWrite()); // Boolean statt "Ja/Nein"
-            row.add(model.getFile().isHidden()); // Boolean statt "Ja/Nein"
+            row.add(model.getFile().isFile() && !model.getFile().canWrite()); // Boolean
+            row.add(model.getFile().isHidden()); // Boolean
             tableModel.addRow(row);
         });
-    }
-
-    /**
-     * Aktualisiert den Fortschrittsbalken.
-     */
-    private void updateProgress(int progress) {
-        SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
     }
 
     /**
@@ -230,13 +267,75 @@ public class FileSearchScreenView extends JFrame {
      */
     private void deleteSelectedFiles() {
         int rowCount = tableModel.getRowCount();
-        for (int i = rowCount - 1; i >= 0; i--) {
+        if (rowCount == 0) return;
+
+        java.util.List<Integer> rowsToRemove = new java.util.ArrayList<>();
+        java.util.List<Path> filesToDelete = new java.util.ArrayList<>();
+
+        // 1) Ausgewählte Dateien einsammeln (aus dem *Model*, nicht aus der View)
+        for (int i = 0; i < rowCount; i++) {
             Boolean selected = (Boolean) tableModel.getValueAt(i, 0);
             if (Boolean.TRUE.equals(selected)) {
-                String filePath = tableModel.getValueAt(i, 2) + "/" + tableModel.getValueAt(i, 1);
-                System.out.println("[DEBUG] Lösche Datei: " + filePath);
-                tableModel.removeRow(i);
+                String name   = (String) tableModel.getValueAt(i, 1);
+                String parent = (String) tableModel.getValueAt(i, 2);
+                Path p = (parent == null || parent.isBlank())
+                        ? Paths.get(name)
+                        : Paths.get(parent, name);
+                filesToDelete.add(p);
+                rowsToRemove.add(i);
             }
+        }
+
+        if (filesToDelete.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Keine Dateien ausgewählt.", "Hinweis", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // 2) Sicherheitsabfrage
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Möchten Sie " + filesToDelete.size() + " Datei(en) endgültig löschen?",
+                "Löschen bestätigen",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        // 3) Löschen + UI aktualisieren (von hinten nach vorne, damit Indizes passen)
+        int ok = 0, failed = 0;
+        StringBuilder errors = new StringBuilder();
+
+        for (int idx = rowsToRemove.size() - 1; idx >= 0; idx--) {
+            int modelRow = rowsToRemove.get(idx);
+            Path p = filesToDelete.get(idx);
+            try {
+                // dauerhaft löschen:
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    boolean moved = java.awt.Desktop.getDesktop().moveToTrash(p.toFile());
+                    if (moved) { tableModel.removeRow(modelRow); ok++; continue; }
+                }
+            		Files.delete(p); // wirft IOException/SecurityException bei Fehler
+
+                tableModel.removeRow(modelRow);
+                ok++;
+            } catch (IOException | SecurityException ex) {
+                failed++;
+                errors.append(p.toString()).append(" — ").append(ex.getMessage()).append("\n");
+            }
+        }
+
+        if (failed > 0) {
+            JTextArea area = new JTextArea(errors.toString());
+            area.setEditable(false);
+            area.setRows(Math.min(10, failed));
+            JOptionPane.showMessageDialog(
+                    this,
+                    new JScrollPane(area),
+                    "Einige Dateien konnten nicht gelöscht werden (" + failed + ")",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        } else {
+            JOptionPane.showMessageDialog(this, ok + " Datei(en) gelöscht.", "Erfolg", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 }
