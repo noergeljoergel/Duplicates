@@ -1,6 +1,7 @@
 package duplicates.view;
 
 import duplicates.controller.FileSearchController;
+import duplicates.controller.XMLController;
 import duplicates.model.FileSearchModel;
 import duplicates.model.FileSearchOptionsModel;
 
@@ -14,14 +15,16 @@ import java.util.List;
 import java.util.Vector;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.Files;
+import java.io.File;
 import java.io.IOException;
 
 /**
- * Fenster für die Dateisuche.
- * Zeigt Suchfortschritt und Ergebnisse in einer Tabelle.
+ * Fenster für die Dateisuche mit teilweiser Anzeige + XML-Auslagerung.
  */
 public class FileSearchScreenView extends JFrame {
+
+    private static final int MAX_ROWS_IN_TABLE = 5000;      // sichtbare Obergrenze
+    private static final int BATCH_SIZE_FOR_XML = 500;      // ab wievielen zwischenspeichern
 
     private final FileSearchOptionsModel options;
     private final List<String> selectedFolders;
@@ -32,8 +35,20 @@ public class FileSearchScreenView extends JFrame {
     private final JProgressBar progressBar;
     private final JButton btnAbort;
     private final JButton btnDelete;
+    private final JButton btnLoadAll;       // NEU: „Alle Ergebnisse laden“
+    private final JLabel lblStatus;         // NEU: zeigt Auslagerung
 
-    private SwingWorker<Void, FileSearchModel> worker; // SwingWorker für asynchrone Suche
+    private SwingWorker<Void, FileSearchModel> worker;
+
+    // Pfad für ausgelagerte Ergebnisse
+    private final String resultsXmlPath = "results/file_search_results.xml";
+
+    // Zähler/Puffer
+    private int offloadedCount = 0;
+    private int batchCounter = 0;
+    
+    private int totalFoundCount = 0;
+
 
     public FileSearchScreenView(FileSearchOptionsModel options, List<String> selectedFolders) {
         super("Dateisuche");
@@ -44,7 +59,6 @@ public class FileSearchScreenView extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        // --- 1. Tabellenmodell ---
         String[] columns = {
                 "✓", "Dateiname", "Dateipfad", "Größe (Byte)", "Typ", "Erstellt", "Geändert", "Systemdatei", "Versteckt"
         };
@@ -59,79 +73,69 @@ public class FileSearchScreenView extends JFrame {
                     default -> String.class;
                 };
             }
-
             @Override
-            public boolean isCellEditable(int row, int column) {
-                return column == 0;
-            }
+            public boolean isCellEditable(int row, int column) { return column == 0; }
         };
 
         resultTable = new JTable(tableModel);
         resultTable.setAutoCreateRowSorter(true);
         resultTable.setFillsViewportHeight(true);
 
-        // Spaltenbreiten
         TableColumnModel columnModel = resultTable.getColumnModel();
         columnModel.getColumn(0).setPreferredWidth(30);
         columnModel.getColumn(1).setPreferredWidth(170);
         columnModel.getColumn(2).setPreferredWidth(330);
 
-        // Header-Checkbox
         addHeaderCheckBox(columnModel.getColumn(0));
 
-        // Renderer für Größe
         DefaultTableCellRenderer numberRenderer = new DefaultTableCellRenderer() {
             private final NumberFormat nf = NumberFormat.getIntegerInstance();
-            @Override
-            protected void setValue(Object value) {
+            @Override protected void setValue(Object value) {
                 if (value instanceof Number n) {
                     setHorizontalAlignment(SwingConstants.RIGHT);
                     setText(nf.format(n.longValue()));
-                } else {
-                    super.setValue(value);
-                }
+                } else super.setValue(value);
             }
         };
         columnModel.getColumn(3).setCellRenderer(numberRenderer);
 
-        // Renderer für Boolean
         DefaultTableCellRenderer booleanRenderer = new DefaultTableCellRenderer() {
-            @Override
-            public void setValue(Object value) {
+            @Override public void setValue(Object value) {
                 if (value instanceof Boolean b) {
                     setHorizontalAlignment(SwingConstants.CENTER);
                     setText(b ? "✓" : "");
-                } else {
-                    super.setValue(value);
-                }
+                } else super.setValue(value);
             }
         };
         columnModel.getColumn(7).setCellRenderer(booleanRenderer);
         columnModel.getColumn(8).setCellRenderer(booleanRenderer);
 
-        // --- 2. Fortschrittsbalken ---
         progressBar = new JProgressBar(0, 100);
         progressBar.setPreferredSize(new Dimension(getWidth(), 15));
         progressBar.setStringPainted(true);
 
-        // --- 3. Buttons ---
         btnAbort = new JButton("Suche abbrechen");
         btnDelete = new JButton("Ausgewählte löschen");
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        buttonPanel.add(btnAbort);
-        buttonPanel.add(btnDelete);
-
+        btnLoadAll = new JButton("Alle Ergebnisse laden"); // NEU
         btnDelete.setEnabled(false);
 
-        // --- 4. Layout ---
+        lblStatus = new JLabel("Gefunden: 0  ", SwingConstants.RIGHT);
+
+        JPanel leftBtns = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        leftBtns.add(btnAbort);
+        leftBtns.add(btnDelete);
+        leftBtns.add(btnLoadAll); // NEU
+
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(leftBtns, BorderLayout.WEST);
+        topPanel.add(lblStatus, BorderLayout.EAST);
+
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(buttonPanel, BorderLayout.NORTH);
+        mainPanel.add(topPanel, BorderLayout.NORTH);
         mainPanel.add(new JScrollPane(resultTable), BorderLayout.CENTER);
         mainPanel.add(progressBar, BorderLayout.SOUTH);
         add(mainPanel);
 
-        // --- 5. Events ---
         btnAbort.addActionListener(e -> {
             if (worker != null && !worker.isDone()) {
                 worker.cancel(true);
@@ -139,17 +143,19 @@ public class FileSearchScreenView extends JFrame {
                 progressBar.setIndeterminate(false);
                 progressBar.setString("Abgebrochen");
             }
+            // Suchdatei sauber schließen
+            XMLController.endSearchResults();
         });
+
         btnDelete.addActionListener(e -> deleteSelectedFiles());
 
-        // Kontextmenü hinzufügen
+        btnLoadAll.addActionListener(e -> loadAllFromXml()); // NEU
+
         installContextMenu();
 
-        // --- 6. Suche starten ---
         startSearch();
     }
 
-    /** Header-Checkbox **/
     private void addHeaderCheckBox(TableColumn checkboxColumn) {
         JCheckBox selectAll = new JCheckBox();
         selectAll.setHorizontalAlignment(SwingConstants.CENTER);
@@ -161,8 +167,7 @@ public class FileSearchScreenView extends JFrame {
             }
         });
         resultTable.getTableHeader().addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
+            @Override public void mouseClicked(MouseEvent e) {
                 int viewColumn = resultTable.columnAtPoint(e.getPoint());
                 int modelColumn = resultTable.convertColumnIndexToModel(viewColumn);
                 if (modelColumn == 0) {
@@ -173,10 +178,16 @@ public class FileSearchScreenView extends JFrame {
         });
     }
 
-    /** Suche starten **/
     private void startSearch() {
+        // Ergebnis-XML frisch beginnen
+        XMLController.beginSearchResults(resultsXmlPath, options);
+        offloadedCount = 0;
+        batchCounter = 0;
+        updateStatus();
+
         progressBar.setValue(0);
         progressBar.setIndeterminate(false);
+        btnLoadAll.setEnabled(false);
 
         worker = new SwingWorker<>() {
             @Override
@@ -192,7 +203,7 @@ public class FileSearchScreenView extends JFrame {
 
             @Override
             protected void process(List<FileSearchModel> chunks) {
-                for (FileSearchModel model : chunks) addResultRow(model);
+                for (FileSearchModel model : chunks) handleIncomingResult(model);
             }
 
             @Override
@@ -201,8 +212,12 @@ public class FileSearchScreenView extends JFrame {
                 btnDelete.setEnabled(true);
                 progressBar.setIndeterminate(false);
                 progressBar.setValue(100);
+                // XML sauber schließen
+                btnLoadAll.setEnabled(true);
+                XMLController.endSearchResults();
             }
         };
+        System.out.println();
 
         worker.addPropertyChangeListener(evt -> {
             if ("progress".equals(evt.getPropertyName())) {
@@ -214,7 +229,32 @@ public class FileSearchScreenView extends JFrame {
         worker.execute();
     }
 
-    /** Ergebniszeile hinzufügen **/
+    /**
+     * Nimmt ein Ergebnis entgegen:
+     * - bis MAX_ROWS_IN_TABLE ins TableModel
+     * - darüber hinaus: in XML auslagern (batchweise)
+     */
+    private void handleIncomingResult(FileSearchModel model) {
+        totalFoundCount++;       // neuen Treffer zählen
+        updateStatus();
+
+        if (tableModel.getRowCount() < MAX_ROWS_IN_TABLE) {
+            addResultRow(model);
+        } else {
+            // Auslagern
+            XMLController.appendSearchResult(model);
+            // offloadedCount++ und batchCounter kannst du komplett entfernen,
+            // wenn du die ausgelagerte Zahl nicht mehr brauchst
+        }
+    }
+
+    private void updateStatus() {
+        SwingUtilities.invokeLater(() ->
+            lblStatus.setText("Gefunden: " + totalFoundCount + "  ")
+        );
+    }
+
+    /** Ergebniszeile hinzufügen (sichtbare Tabelle) */
     private void addResultRow(FileSearchModel model) {
         SwingUtilities.invokeLater(() -> {
             Vector<Object> row = new Vector<>();
@@ -231,12 +271,42 @@ public class FileSearchScreenView extends JFrame {
         });
     }
 
-    /** Dateien löschen **/
+    /** „Alle Ergebnisse laden“: liest die ausgelagerten XML-Daten und füllt die Tabelle vollständig auf. */
+    private void loadAllFromXml() {
+        // 1) Bereits sichtbare Zeilen belassen – wir hängen die ausgelagerten *zusätzlich* an.
+        //    Falls du stattdessen *nur* aus XML laden willst: tableModel.setRowCount(0);
+
+        XMLController.readSearchResults(resultsXmlPath, rec -> {
+            // Falls der Eintrag bereits sichtbar ist, könntest du hier deduplizieren (optional).
+            // Wir fügen direkt eine Zeile aus den XML-Attributen hinzu (ohne teure Files.readAttributes):
+            Vector<Object> row = new Vector<>();
+            row.add(false);
+            row.add(rec.name != null && !rec.name.isBlank()
+                    ? rec.name
+                    : new File(rec.fullPath).getName());
+            row.add(rec.parent);
+            row.add(rec.sizeBytes);
+            row.add(rec.type);
+            row.add(rec.created != null && !rec.created.isBlank() ? rec.created : "-");
+            row.add(rec.modified != null && !rec.modified.isBlank() ? rec.modified : "-");
+            row.add(rec.readOnly);
+            row.add(rec.hidden);
+            SwingUtilities.invokeLater(() -> tableModel.addRow(row));
+        });
+
+        // Optional: Status zurücksetzen/anzeigen
+        updateStatus();
+        JOptionPane.showMessageDialog(this,
+                "Alle ausgelagerten Ergebnisse wurden geladen.",
+                "Fertig",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /** Dateien löschen – bestehende Logik belassen/ergänzen */
     private void deleteSelectedFiles() {
         // deine vorherige Delete-Methode hier unverändert
     }
 
-    /** Kontextmenü für Rechtsklick **/
     private void installContextMenu() {
         JPopupMenu menu = new JPopupMenu();
         JMenuItem openItem = new JMenuItem("Öffnen");
@@ -248,11 +318,8 @@ public class FileSearchScreenView extends JFrame {
         menu.add(propsItem);
 
         resultTable.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) { showPopup(e); }
-            @Override
-            public void mouseReleased(MouseEvent e) { showPopup(e); }
-
+            @Override public void mousePressed(MouseEvent e) { showPopup(e); }
+            @Override public void mouseReleased(MouseEvent e) { showPopup(e); }
             private void showPopup(MouseEvent e) {
                 if (e.isPopupTrigger()) {
                     int row = resultTable.rowAtPoint(e.getPoint());
@@ -275,9 +342,7 @@ public class FileSearchScreenView extends JFrame {
 
         String name = (String) tableModel.getValueAt(row, 1);
         String parent = (String) tableModel.getValueAt(row, 2);
-        Path path = (parent == null || parent.isBlank())
-                ? Paths.get(name)
-                : Paths.get(parent, name);
+        Path path = (parent == null || parent.isBlank()) ? Paths.get(name) : Paths.get(parent, name);
 
         try {
             if ("open".equals(action)) {

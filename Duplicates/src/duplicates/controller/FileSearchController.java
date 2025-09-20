@@ -194,7 +194,7 @@ public class FileSearchController {
             // 1) Frühe & günstige Checks (ohne teure Attribute):
             // Größe
             if (options.getMinFileSize() > 0 || options.getMaxFileSize() > 0) {
-                double sizeMB = file.length() / (1024.0 * 1024.0);
+                double sizeMB = file.length();
                 if (options.getMinFileSize() > 0 && sizeMB < options.getMinFileSize()) return false;
                 if (options.getMaxFileSize() > 0 && sizeMB > options.getMaxFileSize()) return false;
             }
