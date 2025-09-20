@@ -1,7 +1,6 @@
 package duplicates.view;
 
 import duplicates.controller.FileSearchController;
-import duplicates.controller.XMLController;
 import duplicates.model.FileSearchModel;
 import duplicates.model.FileSearchOptionsModel;
 
@@ -10,21 +9,14 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.text.NumberFormat;
-import java.util.List;
-import java.util.Vector;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.*;
+import java.text.NumberFormat;
+import java.util.*;
+import java.util.List;
 
-/**
- * Fenster für die Dateisuche mit teilweiser Anzeige + XML-Auslagerung.
- */
 public class FileSearchScreenView extends JFrame {
-
-    private static final int MAX_ROWS_IN_TABLE = 5000;      // sichtbare Obergrenze
-    private static final int BATCH_SIZE_FOR_XML = 500;      // ab wievielen zwischenspeichern
 
     private final FileSearchOptionsModel options;
     private final List<String> selectedFolders;
@@ -35,20 +27,18 @@ public class FileSearchScreenView extends JFrame {
     private final JProgressBar progressBar;
     private final JButton btnAbort;
     private final JButton btnDelete;
-    private final JButton btnLoadAll;       // NEU: „Alle Ergebnisse laden“
-    private final JLabel lblStatus;         // NEU: zeigt Auslagerung
 
-    private SwingWorker<Void, FileSearchModel> worker;
+    private SwingWorker<Void, FileSearchModel> worker; // SwingWorker für asynchrone Suche
 
-    // Pfad für ausgelagerte Ergebnisse
-    private final String resultsXmlPath = "results/file_search_results.xml";
-
-    // Zähler/Puffer
-    private int offloadedCount = 0;
-    private int batchCounter = 0;
-    
-    private int totalFoundCount = 0;
-
+    // --- Whitelist für "Öffnen" ---
+    private static final Set<String> OPENABLE_EXTENSIONS = Set.of(
+            "exe", "bat", "com", "msi",
+            "txt", "log", "csv", "xml", "json", "ini",
+            "jpg", "jpeg", "png", "gif", "bmp", "tiff",
+            "mp3", "wav", "flac", "ogg",
+            "mp4", "mov", "avi", "mkv", "wmv", "webm",
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"
+    );
 
     public FileSearchScreenView(FileSearchOptionsModel options, List<String> selectedFolders) {
         super("Dateisuche");
@@ -59,6 +49,7 @@ public class FileSearchScreenView extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
+        // --- Tabelle ---
         String[] columns = {
                 "✓", "Dateiname", "Dateipfad", "Größe (Byte)", "Typ", "Erstellt", "Geändert", "Systemdatei", "Versteckt"
         };
@@ -73,14 +64,18 @@ public class FileSearchScreenView extends JFrame {
                     default -> String.class;
                 };
             }
+
             @Override
-            public boolean isCellEditable(int row, int column) { return column == 0; }
+            public boolean isCellEditable(int row, int column) {
+                return column == 0;
+            }
         };
 
         resultTable = new JTable(tableModel);
         resultTable.setAutoCreateRowSorter(true);
         resultTable.setFillsViewportHeight(true);
 
+        // Spaltenbreiten
         TableColumnModel columnModel = resultTable.getColumnModel();
         columnModel.getColumn(0).setPreferredWidth(30);
         columnModel.getColumn(1).setPreferredWidth(170);
@@ -88,54 +83,59 @@ public class FileSearchScreenView extends JFrame {
 
         addHeaderCheckBox(columnModel.getColumn(0));
 
+        // Renderer für Größe
         DefaultTableCellRenderer numberRenderer = new DefaultTableCellRenderer() {
             private final NumberFormat nf = NumberFormat.getIntegerInstance();
-            @Override protected void setValue(Object value) {
+
+            @Override
+            protected void setValue(Object value) {
                 if (value instanceof Number n) {
                     setHorizontalAlignment(SwingConstants.RIGHT);
                     setText(nf.format(n.longValue()));
-                } else super.setValue(value);
+                } else {
+                    super.setValue(value);
+                }
             }
         };
         columnModel.getColumn(3).setCellRenderer(numberRenderer);
 
+        // Renderer für Boolean
         DefaultTableCellRenderer booleanRenderer = new DefaultTableCellRenderer() {
-            @Override public void setValue(Object value) {
+            @Override
+            public void setValue(Object value) {
                 if (value instanceof Boolean b) {
                     setHorizontalAlignment(SwingConstants.CENTER);
                     setText(b ? "✓" : "");
-                } else super.setValue(value);
+                } else {
+                    super.setValue(value);
+                }
             }
         };
         columnModel.getColumn(7).setCellRenderer(booleanRenderer);
         columnModel.getColumn(8).setCellRenderer(booleanRenderer);
 
+        // --- Fortschrittsbalken ---
         progressBar = new JProgressBar(0, 100);
         progressBar.setPreferredSize(new Dimension(getWidth(), 15));
         progressBar.setStringPainted(true);
 
+        // --- Buttons ---
         btnAbort = new JButton("Suche abbrechen");
         btnDelete = new JButton("Ausgewählte löschen");
-        btnLoadAll = new JButton("Alle Ergebnisse laden"); // NEU
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttonPanel.add(btnAbort);
+        buttonPanel.add(btnDelete);
         btnDelete.setEnabled(false);
 
-        lblStatus = new JLabel("Gefunden: 0  ", SwingConstants.RIGHT);
-
-        JPanel leftBtns = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        leftBtns.add(btnAbort);
-        leftBtns.add(btnDelete);
-        leftBtns.add(btnLoadAll); // NEU
-
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(leftBtns, BorderLayout.WEST);
-        topPanel.add(lblStatus, BorderLayout.EAST);
-
+        // --- Layout ---
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(topPanel, BorderLayout.NORTH);
+        mainPanel.add(buttonPanel, BorderLayout.NORTH);
         mainPanel.add(new JScrollPane(resultTable), BorderLayout.CENTER);
         mainPanel.add(progressBar, BorderLayout.SOUTH);
         add(mainPanel);
 
+        // --- Events ---
         btnAbort.addActionListener(e -> {
             if (worker != null && !worker.isDone()) {
                 worker.cancel(true);
@@ -143,19 +143,17 @@ public class FileSearchScreenView extends JFrame {
                 progressBar.setIndeterminate(false);
                 progressBar.setString("Abgebrochen");
             }
-            // Suchdatei sauber schließen
-            XMLController.endSearchResults();
         });
-
         btnDelete.addActionListener(e -> deleteSelectedFiles());
 
-        btnLoadAll.addActionListener(e -> loadAllFromXml()); // NEU
-
+        // Kontextmenü hinzufügen
         installContextMenu();
 
+        // --- Suche starten ---
         startSearch();
     }
 
+    /** Header-Checkbox **/
     private void addHeaderCheckBox(TableColumn checkboxColumn) {
         JCheckBox selectAll = new JCheckBox();
         selectAll.setHorizontalAlignment(SwingConstants.CENTER);
@@ -167,7 +165,8 @@ public class FileSearchScreenView extends JFrame {
             }
         });
         resultTable.getTableHeader().addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
+            @Override
+            public void mouseClicked(MouseEvent e) {
                 int viewColumn = resultTable.columnAtPoint(e.getPoint());
                 int modelColumn = resultTable.convertColumnIndexToModel(viewColumn);
                 if (modelColumn == 0) {
@@ -178,16 +177,10 @@ public class FileSearchScreenView extends JFrame {
         });
     }
 
+    /** Suche starten **/
     private void startSearch() {
-        // Ergebnis-XML frisch beginnen
-        XMLController.beginSearchResults(resultsXmlPath, options);
-        offloadedCount = 0;
-        batchCounter = 0;
-        updateStatus();
-
         progressBar.setValue(0);
         progressBar.setIndeterminate(false);
-        btnLoadAll.setEnabled(false);
 
         worker = new SwingWorker<>() {
             @Override
@@ -195,7 +188,9 @@ public class FileSearchScreenView extends JFrame {
                 controller.searchFiles(
                         selectedFolders,
                         options,
-                        model -> { if (!isCancelled()) publish(model); },
+                        model -> {
+                            if (!isCancelled()) publish(model);
+                        },
                         this::setProgress
                 );
                 return null;
@@ -203,7 +198,7 @@ public class FileSearchScreenView extends JFrame {
 
             @Override
             protected void process(List<FileSearchModel> chunks) {
-                for (FileSearchModel model : chunks) handleIncomingResult(model);
+                for (FileSearchModel model : chunks) addResultRow(model);
             }
 
             @Override
@@ -212,12 +207,8 @@ public class FileSearchScreenView extends JFrame {
                 btnDelete.setEnabled(true);
                 progressBar.setIndeterminate(false);
                 progressBar.setValue(100);
-                // XML sauber schließen
-                btnLoadAll.setEnabled(true);
-                XMLController.endSearchResults();
             }
         };
-        System.out.println();
 
         worker.addPropertyChangeListener(evt -> {
             if ("progress".equals(evt.getPropertyName())) {
@@ -229,32 +220,7 @@ public class FileSearchScreenView extends JFrame {
         worker.execute();
     }
 
-    /**
-     * Nimmt ein Ergebnis entgegen:
-     * - bis MAX_ROWS_IN_TABLE ins TableModel
-     * - darüber hinaus: in XML auslagern (batchweise)
-     */
-    private void handleIncomingResult(FileSearchModel model) {
-        totalFoundCount++;       // neuen Treffer zählen
-        updateStatus();
-
-        if (tableModel.getRowCount() < MAX_ROWS_IN_TABLE) {
-            addResultRow(model);
-        } else {
-            // Auslagern
-            XMLController.appendSearchResult(model);
-            // offloadedCount++ und batchCounter kannst du komplett entfernen,
-            // wenn du die ausgelagerte Zahl nicht mehr brauchst
-        }
-    }
-
-    private void updateStatus() {
-        SwingUtilities.invokeLater(() ->
-            lblStatus.setText("Gefunden: " + totalFoundCount + "  ")
-        );
-    }
-
-    /** Ergebniszeile hinzufügen (sichtbare Tabelle) */
+    /** Ergebniszeile hinzufügen **/
     private void addResultRow(FileSearchModel model) {
         SwingUtilities.invokeLater(() -> {
             Vector<Object> row = new Vector<>();
@@ -271,100 +237,141 @@ public class FileSearchScreenView extends JFrame {
         });
     }
 
-    /** „Alle Ergebnisse laden“: liest die ausgelagerten XML-Daten und füllt die Tabelle vollständig auf. */
-    private void loadAllFromXml() {
-        // 1) Bereits sichtbare Zeilen belassen – wir hängen die ausgelagerten *zusätzlich* an.
-        //    Falls du stattdessen *nur* aus XML laden willst: tableModel.setRowCount(0);
-
-        XMLController.readSearchResults(resultsXmlPath, rec -> {
-            // Falls der Eintrag bereits sichtbar ist, könntest du hier deduplizieren (optional).
-            // Wir fügen direkt eine Zeile aus den XML-Attributen hinzu (ohne teure Files.readAttributes):
-            Vector<Object> row = new Vector<>();
-            row.add(false);
-            row.add(rec.name != null && !rec.name.isBlank()
-                    ? rec.name
-                    : new File(rec.fullPath).getName());
-            row.add(rec.parent);
-            row.add(rec.sizeBytes);
-            row.add(rec.type);
-            row.add(rec.created != null && !rec.created.isBlank() ? rec.created : "-");
-            row.add(rec.modified != null && !rec.modified.isBlank() ? rec.modified : "-");
-            row.add(rec.readOnly);
-            row.add(rec.hidden);
-            SwingUtilities.invokeLater(() -> tableModel.addRow(row));
-        });
-
-        // Optional: Status zurücksetzen/anzeigen
-        updateStatus();
-        JOptionPane.showMessageDialog(this,
-                "Alle ausgelagerten Ergebnisse wurden geladen.",
-                "Fertig",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    /** Dateien löschen – bestehende Logik belassen/ergänzen */
+    /** Dateien löschen **/
     private void deleteSelectedFiles() {
         // deine vorherige Delete-Methode hier unverändert
     }
 
+    /** Kontextmenü **/
     private void installContextMenu() {
         JPopupMenu menu = new JPopupMenu();
         JMenuItem openItem = new JMenuItem("Öffnen");
         JMenuItem showItem = new JMenuItem("Im Ordner anzeigen");
+        JMenuItem cutItem = new JMenuItem("Ausschneiden");
+        JMenuItem copyItem = new JMenuItem("Kopieren");
+        JMenuItem deleteItem = new JMenuItem("Löschen");
+        JMenuItem deleteDirItem = new JMenuItem("Verzeichnis löschen");
         JMenuItem propsItem = new JMenuItem("Eigenschaften");
 
+        // hinzufügen in Blöcken
         menu.add(openItem);
         menu.add(showItem);
+        menu.addSeparator();
+        menu.add(cutItem);
+        menu.add(copyItem);
+        menu.add(deleteItem);
+        menu.add(deleteDirItem);
+        menu.addSeparator();
         menu.add(propsItem);
 
         resultTable.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { showPopup(e); }
-            @Override public void mouseReleased(MouseEvent e) { showPopup(e); }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                showPopup(e);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                showPopup(e);
+            }
+
             private void showPopup(MouseEvent e) {
                 if (e.isPopupTrigger()) {
                     int row = resultTable.rowAtPoint(e.getPoint());
                     if (row >= 0 && row < resultTable.getRowCount()) {
                         resultTable.setRowSelectionInterval(row, row);
+
+                        // Pfad der Datei
+                        String name = (String) tableModel.getValueAt(row, 1);
+                        String parent = (String) tableModel.getValueAt(row, 2);
+                        Path path = (parent == null || parent.isBlank())
+                                ? Paths.get(name)
+                                : Paths.get(parent, name);
+                        File file = path.toFile();
+
+                        // --- Aktivierung prüfen ---
+                        openItem.setEnabled(isOpenableFile(file));
+                        deleteDirItem.setEnabled(!isRootDirectory(file));
+
                         menu.show(e.getComponent(), e.getX(), e.getY());
                     }
                 }
             }
         });
 
+        // Aktionen
         openItem.addActionListener(e -> performAction("open"));
         showItem.addActionListener(e -> performAction("show"));
+        deleteItem.addActionListener(e -> performAction("delete"));
+        deleteDirItem.addActionListener(e -> performAction("deleteDir"));
         propsItem.addActionListener(e -> performAction("props"));
     }
 
+    /** Aktionen **/
     private void performAction(String action) {
         int row = resultTable.getSelectedRow();
         if (row < 0) return;
 
         String name = (String) tableModel.getValueAt(row, 1);
         String parent = (String) tableModel.getValueAt(row, 2);
-        Path path = (parent == null || parent.isBlank()) ? Paths.get(name) : Paths.get(parent, name);
+        Path path = (parent == null || parent.isBlank())
+                ? Paths.get(name)
+                : Paths.get(parent, name);
 
         try {
-            if ("open".equals(action)) {
-                Desktop.getDesktop().open(path.toFile());
-            } else if ("show".equals(action)) {
-                if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                    new ProcessBuilder("explorer.exe", "/select,", path.toAbsolutePath().toString()).start();
-                } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
-                    new ProcessBuilder("open", "-R", path.toAbsolutePath().toString()).start();
-                } else {
-                    Desktop.getDesktop().open(path.getParent().toFile());
+            switch (action) {
+                case "open" -> Desktop.getDesktop().open(path.toFile());
+                case "show" -> {
+                    if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                        new ProcessBuilder("explorer.exe", "/select,", path.toAbsolutePath().toString()).start();
+                    } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+                        new ProcessBuilder("open", "-R", path.toAbsolutePath().toString()).start();
+                    } else {
+                        Desktop.getDesktop().open(path.getParent().toFile());
+                    }
                 }
-            } else if ("props".equals(action)) {
-                if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                    new ProcessBuilder("rundll32", "shell32.dll,ShellExec_RunDLL",
-                            "properties", path.toAbsolutePath().toString()).start();
-                } else {
-                    JOptionPane.showMessageDialog(this,
-                            "Pfad: " + path.toString(),
-                            "Eigenschaften",
-                            JOptionPane.INFORMATION_MESSAGE);
+                case "delete" -> {
+                    int confirm = JOptionPane.showConfirmDialog(this,
+                            "Datei wirklich löschen?\n" + path,
+                            "Löschen bestätigen",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.WARNING_MESSAGE);
+                    if (confirm == JOptionPane.YES_OPTION) {
+                        Files.deleteIfExists(path);
+                    }
                 }
+                case "deleteDir" -> {
+                    Path dirPath = path.getParent();
+                    int confirm = JOptionPane.showConfirmDialog(this,
+                            "Soll das gesamte Verzeichnis wirklich gelöscht werden?\n" + dirPath,
+                            "Verzeichnis löschen",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.WARNING_MESSAGE);
+                    if (confirm != JOptionPane.YES_OPTION) return;
+
+                    String input = JOptionPane.showInputDialog(this,
+                            "Bitte tippe 'löschen' ein, um den Vorgang zu bestätigen:",
+                            "Sicherheitsabfrage",
+                            JOptionPane.WARNING_MESSAGE);
+                    if (input == null || !input.equalsIgnoreCase("löschen")) {
+                        JOptionPane.showMessageDialog(this,
+                                "Löschvorgang abgebrochen.",
+                                "Abbruch",
+                                JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+
+                    Files.walk(dirPath)
+                            .sorted((p1, p2) -> p2.compareTo(p1))
+                            .forEach(p -> {
+                                try {
+                                    Files.deleteIfExists(p);
+                                } catch (IOException ex) {
+                                    System.err.println("Fehler beim Löschen: " + p + " - " + ex.getMessage());
+                                }
+                            });
+                }
+                case "props" -> SwingUtilities.invokeLater(() -> new FilePropertiesView(path.toFile()).setVisible(true));
             }
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
@@ -372,5 +379,19 @@ public class FileSearchScreenView extends JFrame {
                     "Aktion fehlgeschlagen",
                     JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    // --- Hilfsfunktionen ---
+    private boolean isOpenableFile(File file) {
+        String name = file.getName().toLowerCase();
+        int dot = name.lastIndexOf('.');
+        if (dot == -1) return false;
+        String ext = name.substring(dot + 1);
+        return OPENABLE_EXTENSIONS.contains(ext);
+    }
+
+    private boolean isRootDirectory(File file) {
+        Path parent = file.toPath().getParent();
+        return parent == null || parent.getParent() == null;
     }
 }
