@@ -1,4 +1,4 @@
-package duplicates.view;
+package duplicates.renderer;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultTreeCellRenderer;

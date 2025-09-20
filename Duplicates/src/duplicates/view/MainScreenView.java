@@ -5,6 +5,8 @@ import duplicates.controller.XMLController;
 import duplicates.model.DuplicateSearchOptionsModel;
 import duplicates.model.FileSearchOptionsModel;
 import duplicates.model.FolderTreeModel;
+import duplicates.renderer.CheckBoxNodeEditor;
+import duplicates.renderer.CheckBoxNodeRenderer;
 
 import javax.swing.*;
 import javax.swing.event.TreeModelEvent;

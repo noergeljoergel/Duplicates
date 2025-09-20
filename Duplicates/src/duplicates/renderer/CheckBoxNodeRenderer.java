@@ -1,4 +1,4 @@
-package duplicates.view;
+package duplicates.renderer;
 
 import duplicates.model.CheckBoxNode;
 

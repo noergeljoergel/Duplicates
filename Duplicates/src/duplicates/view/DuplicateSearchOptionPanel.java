@@ -12,18 +12,13 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.ResolverStyle;
 import java.util.List;
 
-/**
- * UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
- * 
- */
+/** Optionen für die Duplikatsuche (mit Validierung). */
 public class DuplicateSearchOptionPanel extends JPanel {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.uuuu");
 
-    // --- Eingabefelder ---
     private JFormattedTextField minField;
     private JFormattedTextField maxField;
     private JFormattedTextField fileExtention;
@@ -37,33 +32,25 @@ public class DuplicateSearchOptionPanel extends JPanel {
     private JCheckBox chkSubFolder;
     private JCheckBox chkFileExtention;
 
-    // --- Referenz auf MainScreenView, um Ordnerliste zu bekommen ---
     private final MainScreenView mainScreenView;
 
     public DuplicateSearchOptionPanel(MainScreenView mainScreenView) {
         super(new BorderLayout(5, 5));
-        this.mainScreenView = mainScreenView; // Referenz speichern
+        this.mainScreenView = mainScreenView;
 
-        // --- Titel ---
         JLabel title = new JLabel("Suche nach Duplikaten");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
         title.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         add(title, BorderLayout.NORTH);
 
-        // --- Optionspanel ---
         JPanel centerPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 6, 4, 6);
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.NONE;
-
         int row = 0;
 
-        // --- 1: Min File Size ---
-        gbc.gridy = row;
-        gbc.gridx = 0;
-        centerPanel.add(new JLabel("Min. Dateigröße (Byte):"), gbc);
-
+        // Zahlenformatter (Bytes)
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
         numberFormat.setGroupingUsed(true);
         numberFormat.setMaximumFractionDigits(0);
@@ -72,114 +59,78 @@ public class DuplicateSearchOptionPanel extends JPanel {
         formatterNumbers.setAllowsInvalid(false);
         formatterNumbers.setMinimum(0L);
 
+        // 1: Min
+        gbc.gridy = row; gbc.gridx = 0;
+        centerPanel.add(new JLabel("Min. Dateigröße (Byte):"), gbc);
         minField = new JFormattedTextField(formatterNumbers);
         minField.setColumns(12);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(minField, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(minField, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- 2: Max File Size ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
+        // 2: Max
+        row++; gbc.gridy = row; gbc.gridx = 0;
         centerPanel.add(new JLabel("Max. Dateigröße (Byte):"), gbc);
-
         maxField = new JFormattedTextField(formatterNumbers);
         maxField.setColumns(12);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(maxField, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(maxField, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- 3: File Extensions ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
+        // 3: Extensions
+        row++; gbc.gridy = row; gbc.gridx = 0;
         centerPanel.add(new JLabel("Dateiendungen:"), gbc);
-
         DefaultFormatter formatterText = new DefaultFormatter();
         formatterText.setOverwriteMode(false);
         formatterText.setAllowsInvalid(true);
-
         fileExtention = new JFormattedTextField(formatterText);
         fileExtention.setColumns(23);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(fileExtention, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(fileExtention, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- 4: File Name ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
+        // 4: Name enthält
+        row++; gbc.gridy = row; gbc.gridx = 0;
         centerPanel.add(new JLabel("Dateiname enthält:"), gbc);
-
         fileNameString1 = new JFormattedTextField(formatterText);
         fileNameString1.setColumns(12);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(fileNameString1, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(fileNameString1, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- Created Date ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
+        // 5: Erstellt am
+        row++; gbc.gridy = row; gbc.gridx = 0;
         centerPanel.add(new JLabel("Erstellt am:"), gbc);
-
         JPanel createdPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        createdDateOperator = createOpCombo();
-        createdPanel.add(createdDateOperator);
-        createdDateField = createStrictDateField();
-        createdPanel.add(createdDateField);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(createdPanel, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        createdDateOperator = createOpCombo(); createdPanel.add(createdDateOperator);
+        createdDateField = createStrictDateField(); createdPanel.add(createdDateField);
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(createdPanel, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- Modified Date ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
+        // 6: Geändert am
+        row++; gbc.gridy = row; gbc.gridx = 0;
         centerPanel.add(new JLabel("Letzte Änderung:"), gbc);
-
         JPanel modifiedPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        modifiedDateOperator = createOpCombo();
-        modifiedPanel.add(modifiedDateOperator);
-        modificationDate = createStrictDateField();
-        modifiedPanel.add(modificationDate);
-        gbc.gridx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(modifiedPanel, gbc);
-        gbc.fill = GridBagConstraints.NONE;
+        modifiedDateOperator = createOpCombo(); modifiedPanel.add(modifiedDateOperator);
+        modificationDate = createStrictDateField(); modifiedPanel.add(modificationDate);
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(modifiedPanel, gbc); gbc.fill = GridBagConstraints.NONE;
 
-        // --- Checkboxes in zwei Reihen ---
-        row++;
-        gbc.gridy = row;
-        gbc.gridx = 0;
-        gbc.gridwidth = 2;
-
+        // 7: Checkboxes
+        row++; gbc.gridy = row; gbc.gridx = 0; gbc.gridwidth = 2;
         JPanel checkPanel = new JPanel(new GridLayout(2, 2, 8, 4));
-        chkSubFolder = new JCheckBox("Unterordner berücksichtigen");
-        chkFileSize = new JCheckBox("Dateigröße prüfen");
-        chkFileName = new JCheckBox("Dateiname prüfen");
+        chkSubFolder   = new JCheckBox("Unterordner berücksichtigen");
+        chkFileSize    = new JCheckBox("Dateigröße prüfen");
+        chkFileName    = new JCheckBox("Dateiname prüfen");
         chkFileExtention = new JCheckBox("Dateiendungen prüfen");
-
         checkPanel.add(chkSubFolder);
         checkPanel.add(chkFileSize);
         checkPanel.add(chkFileName);
         checkPanel.add(chkFileExtention);
-
         centerPanel.add(checkPanel, gbc);
 
         JPanel wrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         wrapper.add(centerPanel);
         add(wrapper, BorderLayout.CENTER);
 
-        // --- Button Panel ---
+        // Bottom-Buttons
         JPanel buttonPanel = new JPanel(new BorderLayout());
-
         JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         JButton btnSave = new JButton("Speichern");
         btnSave.addActionListener(e -> handleSave());
@@ -187,10 +138,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         btnLoad.addActionListener(e -> handleLoad());
         JButton btnReset = new JButton("Reset");
         btnReset.addActionListener(e -> resetFields());
-
-        leftButtons.add(btnSave);
-        leftButtons.add(btnLoad);
-        leftButtons.add(btnReset);
+        leftButtons.add(btnSave); leftButtons.add(btnLoad); leftButtons.add(btnReset);
 
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
         JButton btnStart = new JButton("Start");
@@ -199,7 +147,6 @@ public class DuplicateSearchOptionPanel extends JPanel {
 
         buttonPanel.add(leftButtons, BorderLayout.WEST);
         buttonPanel.add(rightButtons, BorderLayout.EAST);
-
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
@@ -238,6 +185,7 @@ public class DuplicateSearchOptionPanel extends JPanel {
         try {
             DuplicateSearchOptionsModel model = toModel();
 
+            // --- Ordner prüfen ---
             List<String> selectedFolders = mainScreenView.getSelectedFolders();
             if (selectedFolders.isEmpty()) {
                 JOptionPane.showMessageDialog(this,
@@ -246,9 +194,28 @@ public class DuplicateSearchOptionPanel extends JPanel {
                 return;
             }
 
+            // --- Mindestens ein Kriterium aktiv? (Felder ODER eine der Kriterien-Checkboxen) ---
+            boolean anyFieldFilled =
+                    (minField.getValue() != null && !minField.getValue().toString().isBlank()) ||
+                    (maxField.getValue() != null && !maxField.getValue().toString().isBlank()) ||
+                    (fileExtention.getText() != null && !fileExtention.getText().isBlank()) ||
+                    (fileNameString1.getText() != null && !fileNameString1.getText().isBlank()) ||
+                    (createdDateField.getText() != null && !isDateBlank(createdDateField.getText())) ||
+                    (modificationDate.getText() != null && !isDateBlank(modificationDate.getText()));
+
+            boolean anyCriteriaChecked = chkFileSize.isSelected() || chkFileName.isSelected() || chkFileExtention.isSelected();
+
+            if (!anyFieldFilled && !anyCriteriaChecked) {
+                JOptionPane.showMessageDialog(this,
+                        "Bitte gib mindestens ein Suchkriterium ein oder aktiviere eine Option.\n" +
+                        "(Die Option 'Unterordner berücksichtigen' zählt nicht als Kriterium.)",
+                        "Keine Suchkriterien", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // --- Suche starten ---
             SwingUtilities.invokeLater(() -> {
-                DuplicateSearchScreenView searchView =
-                        new DuplicateSearchScreenView(model, selectedFolders);
+                DuplicateSearchScreenView searchView = new DuplicateSearchScreenView(model, selectedFolders);
                 searchView.setVisible(true);
             });
 
@@ -295,17 +262,11 @@ public class DuplicateSearchOptionPanel extends JPanel {
         }
     }
 
-    private String normalizeDateString(String s) {
-        return s == null || isDateBlank(s) ? "" : s;
-    }
-
     private boolean isDateBlank(String s) {
-        String t = s.replace('.', ' ').trim();
-        for (int i = 0; i < t.length(); i++) {
-            if (Character.isDigit(t.charAt(i))) return false;
-        }
+        String t = s == null ? "" : s.replace('.', ' ').trim();
+        for (int i = 0; i < t.length(); i++) if (Character.isDigit(t.charAt(i))) return false;
         return true;
-    }
+        }
 
     private double numberFrom(JFormattedTextField f) {
         Object v = f.getValue();
@@ -325,14 +286,14 @@ public class DuplicateSearchOptionPanel extends JPanel {
         model.setFileNameString(textOrEmpty(fileNameString1));
 
         model.setFileCreationDateOperator((String) createdDateOperator.getSelectedItem());
-        String createdStr = normalizeDateString(createdDateField.getText());
-        if (!createdStr.isBlank()) {
+        String createdStr = textOrEmpty(createdDateField);
+        if (!createdStr.isBlank() && !isDateBlank(createdStr)) {
             model.setCreationDate(LocalDate.parse(createdStr, DATE_FMT));
         }
 
         model.setFileModificationDateOperator((String) modifiedDateOperator.getSelectedItem());
-        String modifiedStr = normalizeDateString(modificationDate.getText());
-        if (!modifiedStr.isBlank()) {
+        String modifiedStr = textOrEmpty(modificationDate);
+        if (!modifiedStr.isBlank() && !isDateBlank(modifiedStr)) {
             model.setModificationDate(LocalDate.parse(modifiedStr, DATE_FMT));
         }
 
@@ -350,14 +311,10 @@ public class DuplicateSearchOptionPanel extends JPanel {
         maxField.setValue(model.getMaxFileSize());
         fileExtention.setText(model.getFileExtention() != null ? model.getFileExtention() : "");
         fileNameString1.setText(model.getFileNameString() != null ? model.getFileNameString() : "");
-        createdDateOperator.setSelectedItem(model.getFileCreationDateOperator() != null
-                ? model.getFileCreationDateOperator() : "=");
-        createdDateField.setText(model.getCreationDate() != null
-                ? model.getCreationDate().format(DATE_FMT) : "");
-        modifiedDateOperator.setSelectedItem(model.getFileModificationDateOperator() != null
-                ? model.getFileModificationDateOperator() : "=");
-        modificationDate.setText(model.getModificationDate() != null
-                ? model.getModificationDate().format(DATE_FMT) : "");
+        createdDateOperator.setSelectedItem(model.getFileCreationDateOperator() != null ? model.getFileCreationDateOperator() : "=");
+        createdDateField.setText(model.getCreationDate() != null ? model.getCreationDate().format(DATE_FMT) : "");
+        modifiedDateOperator.setSelectedItem(model.getFileModificationDateOperator() != null ? model.getFileModificationDateOperator() : "=");
+        modificationDate.setText(model.getModificationDate() != null ? model.getModificationDate().format(DATE_FMT) : "");
         chkSubFolder.setSelected(model.isSubFolderBoo());
         chkFileSize.setSelected(model.isFileSizeBoo());
         chkFileName.setSelected(model.isFileNameBoo());
